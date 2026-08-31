@@ -1,0 +1,12 @@
+@import './impeccable-tokens.css';
+@import './print.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F8FAFC] text-slate-900 antialiased min-h-screen font-sans;
+  }
+}

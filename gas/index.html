@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR/PO & Stock Management - บริษัท พีดีคิวซี จำกัด</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Sarabun & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <style>
+    body { font-family: 'Sarabun', 'Inter', sans-serif; }
+    [v-cloak] { display: none; }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="no-print bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center font-bold text-white shadow">
+            PD
+          </div>
+          <div>
+            <h1 class="font-bold text-base tracking-tight leading-tight">PDQC PR/PO & Stock</h1>
+            <p class="text-xs text-slate-400">บริษัท พีดีคิวซี จำกัด (PDQC Co., Ltd.)</p>
+          </div>
+        </div>
+
+        <!-- Role Selector & Status -->
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-300">สิทธิ์:</span>
+            <select v-model="currentRole" class="bg-transparent font-medium text-white focus:outline-none cursor-pointer">
+              <option value="REQUESTER_PD" class="bg-slate-800 text-white">คุณวิชัย (Requester PD)</option>
+              <option value="REQUESTER_QC" class="bg-slate-800 text-white">คุณสมหญิง (Requester QC)</option>
+              <option value="ASST_MANAGER" class="bg-slate-800 text-white">คุณสมชาย (Asst. Mgr - ตรวจทาน)</option>
+              <option value="PLANT_MANAGER" class="bg-slate-800 text-white">คุณประเสริฐ (Plant Mgr - อนุมัติ)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <div class="no-print bg-white border-b border-slate-200 shadow-sm sticky top-16 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 overflow-x-auto text-sm font-medium">
+        <button @click="activeTab = 'dashboard'" :class="activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3.5 border-b-2 flex items-center space-x-2 transition">
+          <span>📊 แดชบอร์ด & สต็อก</span>
+        </button>
+        <button @click="activeTab = 'pr'" :class="activeTab === 'pr' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3.5 border-b-2 flex items-center space-x-2 transition">
+          <span>📝 ใบขอซื้อ (PR)</span>
+          <span v-if="pendingPRsCount > 0" class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">{{ pendingPRsCount }}</span>
+        </button>
+        <button @click="activeTab = 'po'" :class="activeTab === 'po' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3.5 border-b-2 flex items-center space-x-2 transition">
+          <span>📦 ใบสั่งซื้อ & ตรวจรับ (PO)</span>
+        </button>
+        <button @click="activeTab = 'stockLogs'" :class="activeTab === 'stockLogs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3.5 border-b-2 flex items-center space-x-2 transition">
+          <span>📜 ประวัติเบิก-รับ (Stock Card)</span>
+        </button>
+        <button @click="activeTab = 'master'" :class="activeTab === 'master' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3.5 border-b-2 flex items-center space-x-2 transition">
+          <span>🗄️ สินค้า & ผู้ขาย</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content Body -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+
+      <!-- Loading State -->
+      <div v-if="loading" class="flex flex-col items-center justify-center py-24 space-y-4">
+        <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-sm text-slate-500">กำลังโหลดข้อมูลจาก Google Sheets...</p>
+      </div>
+
+      <!-- ─── TAB 1: DASHBOARD & STOCK ─── -->
+      <div v-else-if="activeTab === 'dashboard'" class="space-y-6">
+        <!-- Budget & Alert Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">งบประมาณฝ่ายผลิต (PD)</span>
+            <div class="mt-2 flex items-baseline justify-between">
+              <span class="text-2xl font-bold text-slate-900">฿250,000</span>
+              <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md font-medium">พร้อมใช้งาน</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2 mt-3">
+              <div class="bg-indigo-600 h-2 rounded-full" style="width: 15%"></div>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">งบประมาณฝ่าย QC</span>
+            <div class="mt-2 flex items-baseline justify-between">
+              <span class="text-2xl font-bold text-slate-900">฿150,000</span>
+              <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md font-medium">พร้อมใช้งาน</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2 mt-3">
+              <div class="bg-indigo-600 h-2 rounded-full" style="width: 10%"></div>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">สินค้าสต็อกต่ำกว่าเกณฑ์</span>
+              <div class="mt-2 text-2xl font-bold text-rose-600">{{ lowStockProducts.length }} รายการ</div>
+              <span class="text-xs text-slate-400">ควรเปิด PR สั่งซื้อเพิ่ม</span>
+            </div>
+            <button @click="openQuickIssueModal" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition">
+              ⚡ เบิกจ่ายด่วน
+            </button>
+          </div>
+        </div>
+
+        <!-- Stock Table -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+            <h3 class="font-bold text-slate-800 text-sm">รายการสต็อกสินค้าและจุดสั่งซื้อซ้ำ (Stock Balance)</h3>
+            <span class="text-xs text-slate-500">รวม {{ products.length }} รายการ</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 text-slate-600 text-xs font-semibold border-b border-slate-200 uppercase">
+                <tr>
+                  <th class="px-6 py-3">รหัสสินค้า</th>
+                  <th class="px-6 py-3">ชื่อสินค้า / รายละเอียด</th>
+                  <th class="px-6 py-3">แผนก</th>
+                  <th class="px-6 py-3 text-right">คงเหลือ</th>
+                  <th class="px-6 py-3 text-right">จุดสั่งซื้อซ้ำ</th>
+                  <th class="px-6 py-3">ตำแหน่งจัดเก็บ</th>
+                  <th class="px-6 py-3 text-center">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="p in products" :key="p.id" class="hover:bg-slate-50/80 transition">
+                  <td class="px-6 py-4 font-mono font-medium text-xs text-indigo-600">{{ p.code }}</td>
+                  <td class="px-6 py-4 font-medium text-slate-900">{{ p.name }}</td>
+                  <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-semibold" :class="p.category === 'PD' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'">{{ p.category }}</span></td>
+                  <td class="px-6 py-4 text-right font-bold text-slate-800">{{ (Number(p.stockBalance) || 0).toLocaleString() }} {{ p.stockUnit }}</td>
+                  <td class="px-6 py-4 text-right text-slate-500">{{ p.reorderPoint }} {{ p.stockUnit }}</td>
+                  <td class="px-6 py-4 text-xs text-slate-600">{{ p.locationName || '-' }}</td>
+                  <td class="px-6 py-4 text-center">
+                    <span v-if="Number(p.stockBalance) <= Number(p.reorderPoint)" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                      สต็อกต่ำ
+                    </span>
+                    <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                      ปกติ
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── TAB 2: PR MANAGEMENT ─── -->
+      <div v-else-if="activeTab === 'pr'" class="space-y-6">
+        <div class="flex justify-between items-center">
+          <h2 class="text-lg font-bold text-slate-900">รายการใบขอซื้อ (Purchase Requests)</h2>
+          <button @click="openCreatePRModal" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center space-x-1.5">
+            <span>+ สร้างใบขอซื้อ (New PR)</span>
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs font-semibold border-b border-slate-200 uppercase">
+              <tr>
+                <th class="px-6 py-3">เลขที่ PR</th>
+                <th class="px-6 py-3">แผนก</th>
+                <th class="px-6 py-3">ผู้ขอซื้อ</th>
+                <th class="px-6 py-3 text-right">ยอดรวม (บาท)</th>
+                <th class="px-6 py-3 text-center">สถานะ</th>
+                <th class="px-6 py-3 text-right">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="prs.length === 0">
+                <td colspan="6" class="px-6 py-12 text-center text-slate-400">ยังไม่มีรายการใบขอซื้อในระบบ</td>
+              </tr>
+              <tr v-for="pr in prs" :key="pr.id" class="hover:bg-slate-50/80 transition">
+                <td class="px-6 py-4 font-mono font-bold text-indigo-600">{{ pr.prNumber }}</td>
+                <td class="px-6 py-4 font-medium">{{ pr.department }}</td>
+                <td class="px-6 py-4">{{ pr.requesterName }}</td>
+                <td class="px-6 py-4 text-right font-bold">฿{{ (pr.totalAmount || 0).toLocaleString() }}</td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 rounded-full text-xs font-semibold" :class="getPRStatusBadge(pr.status)">
+                    {{ pr.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-2">
+                  <button v-if="canApprove && (pr.status === 'SUBMITTED' || pr.status === 'REVIEWED')" @click="approvePR(pr.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-sm">
+                    อนุมัติ & ออก PO
+                  </button>
+                  <button @click="viewPRDetails(pr)" class="text-slate-600 hover:text-indigo-600 text-xs font-medium underline">
+                    ดูรายละเอียด
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── TAB 3: PO & RECEIVING ─── -->
+      <div v-else-if="activeTab === 'po'" class="space-y-6">
+        <h2 class="text-lg font-bold text-slate-900">รายการใบสั่งซื้อและตรวจรับ (Purchase Orders)</h2>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs font-semibold border-b border-slate-200 uppercase">
+              <tr>
+                <th class="px-6 py-3">เลขที่ PO</th>
+                <th class="px-6 py-3">อ้างอิง PR</th>
+                <th class="px-6 py-3">ผู้จำหน่าย (Vendor)</th>
+                <th class="px-6 py-3 text-right">ยอดรวมสุทธิ</th>
+                <th class="px-6 py-3 text-center">สถานะ</th>
+                <th class="px-6 py-3 text-right">การตรวจรับ & พิมพ์</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="pos.length === 0">
+                <td colspan="6" class="px-6 py-12 text-center text-slate-400">ยังไม่มีรายการใบสั่งซื้อในระบบ</td>
+              </tr>
+              <tr v-for="po in pos" :key="po.id" class="hover:bg-slate-50/80 transition">
+                <td class="px-6 py-4 font-mono font-bold text-indigo-600">{{ po.poNumber }}</td>
+                <td class="px-6 py-4 font-mono text-xs text-slate-500">{{ po.prNumber }}</td>
+                <td class="px-6 py-4">{{ po.vendorName || po.customVendorName || '-' }}</td>
+                <td class="px-6 py-4 text-right font-bold">฿{{ (po.grandTotal || 0).toLocaleString() }}</td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 rounded-full text-xs font-semibold" :class="getPOStatusBadge(po.status)">
+                    {{ po.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-2">
+                  <button v-if="po.status !== 'RECEIVED' && po.status !== 'CLOSED'" @click="openReceiveModal(po)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                    รับของเข้าคลัง
+                  </button>
+                  <button @click="printPODocument(po)" class="border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg transition">
+                    พิมพ์ PO (A4)
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── TAB 4: STOCK LOGS ─── -->
+      <div v-else-if="activeTab === 'stockLogs'" class="space-y-6">
+        <h2 class="text-lg font-bold text-slate-900">ประวัติความเคลื่อนไหวสินค้า (Stock Movement & Audit)</h2>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs font-semibold border-b border-slate-200 uppercase">
+              <tr>
+                <th class="px-6 py-3">วัน-เวลา</th>
+                <th class="px-6 py-3">ประเภท</th>
+                <th class="px-6 py-3">รหัส / ชื่อสินค้า</th>
+                <th class="px-6 py-3 text-right">จำนวน</th>
+                <th class="px-6 py-3">อ้างอิง</th>
+                <th class="px-6 py-3">ผู้ทำรายการ / หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="stockLogs.length === 0">
+                <td colspan="6" class="px-6 py-12 text-center text-slate-400">ยังไม่มีประวัติการเบิก-รับสินค้า</td>
+              </tr>
+              <tr v-for="log in stockLogs" :key="log.id" class="hover:bg-slate-50/80 transition">
+                <td class="px-6 py-4 text-xs text-slate-500">{{ new Date(log.timestamp).toLocaleString('th-TH') }}</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 rounded text-xs font-bold" :class="log.type === 'IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
+                    {{ log.type === 'IN' ? '▲ รับเข้า' : '▼ เบิกจ่าย' }}
+                  </span>
+                </td>
+                <td class="px-6 py-4">
+                  <p class="font-medium text-slate-900">{{ log.productName }}</p>
+                  <p class="text-xs font-mono text-slate-400">{{ log.productCode }}</p>
+                </td>
+                <td class="px-6 py-4 text-right font-bold" :class="log.type === 'IN' ? 'text-emerald-700' : 'text-rose-700'">
+                  {{ log.qty > 0 ? '+' + log.qty : log.qty }} {{ log.unit }}
+                </td>
+                <td class="px-6 py-4 text-xs font-mono text-indigo-600">{{ log.referenceId }}</td>
+                <td class="px-6 py-4 text-xs text-slate-600">
+                  <p class="font-medium text-slate-800">{{ log.operator }}</p>
+                  <p class="text-slate-400">{{ log.remarks }}</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── TAB 5: MASTER DATA ─── -->
+      <div v-else-if="activeTab === 'master'" class="space-y-6">
+        <h2 class="text-lg font-bold text-slate-900">ฐานข้อมูลผู้ขายและสินค้า (Master Data)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Vendors List -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-800 text-sm mb-4">รายชื่อผู้ขาย (Vendors)</h3>
+            <ul class="divide-y divide-slate-100 text-sm">
+              <li v-for="v in vendors" :key="v.id" class="py-3 flex justify-between items-center">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ v.name }}</p>
+                  <p class="text-xs text-slate-500">ติดต่อ: {{ v.contact }} | โทร: {{ v.phone }}</p>
+                </div>
+                <span class="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-600">{{ v.department }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Locations List -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-800 text-sm mb-4">จุดจัดเก็บสินค้า (Storage Locations)</h3>
+            <ul class="divide-y divide-slate-100 text-sm">
+              <li v-for="loc in storageLocations" :key="loc.id" class="py-3 flex justify-between items-center">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ loc.name }}</p>
+                  <p class="text-xs font-mono text-indigo-600">{{ loc.id }}</p>
+                </div>
+                <span class="text-xs font-bold px-2 py-1 rounded bg-blue-50 text-blue-700">{{ loc.department }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ─── MODAL: CREATE PR ─── -->
+    <div v-if="showCreatePRModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+        <h3 class="text-base font-bold text-slate-900">สร้างใบขอซื้อสินค้า (Create PR)</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">แผนก</label>
+            <input type="text" v-model="newPR.department" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 text-slate-600 font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ผู้ขอซื้อ</label>
+            <input type="text" v-model="newPR.requesterName" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 text-slate-600 font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">เลือกสินค้า</label>
+          <select v-model="selectedProductId" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+            <option value="">-- กรุณาเลือกสินค้า --</option>
+            <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.code }} - {{ p.name }} (฿{{ p.price }}/{{ p.purchaseUnit }})</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">จำนวนสั่งซื้อ (หน่วยจัดซื้อ)</label>
+            <input type="number" v-model.number="newPRQty" min="1" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">วันที่ต้องการของ</label>
+            <input type="date" v-model="newPR.requiredDate" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+          <button @click="showCreatePRModal = false" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">ยกเลิก</button>
+          <button @click="submitNewPR" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">ส่งขออนุมัติ PR</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── MODAL: QUICK ISSUE ─── -->
+    <div v-if="showQuickIssueModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+        <h3 class="text-base font-bold text-slate-900">⚡ เบิกจ่ายสินค้าด่วน (Quick Issue)</h3>
+        <div class="text-sm space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">เลือกสินค้า</label>
+            <select v-model="quickIssue.productId" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+              <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} (คงเหลือ {{ p.stockBalance }} {{ p.stockUnit }})</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">จำนวนที่เบิก (หน่วยสต็อก)</label>
+            <input type="number" v-model.number="quickIssue.qty" min="1" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">สถานที่ใช้งาน / ห้องปฏิบัติงาน</label>
+            <select v-model="quickIssue.issueLocation" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+              <option value="ห้อง K1">ห้อง K1</option>
+              <option value="ห้อง K2">ห้อง K2</option>
+              <option value="ห้องผลไม้">ห้องผลไม้</option>
+              <option value="ห้องแพ็ค">ห้องแพ็ค</option>
+              <option value="ออฟฟิศ">ออฟฟิศ</option>
+            </select>
+          </div>
+        </div>
+        <div class="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+          <button @click="showQuickIssueModal = false" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">ยกเลิก</button>
+          <button @click="submitQuickIssue" class="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg">ยืนยันเบิกจ่าย</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const loading = ref(true);
+        const activeTab = ref('dashboard');
+        const currentRole = ref('REQUESTER_PD');
+
+        // State Data
+        const products = ref([]);
+        const vendors = ref([]);
+        const storageLocations = ref([]);
+        const prs = ref([]);
+        const pos = ref([]);
+        const stockLogs = ref([]);
+        const budgets = ref([]);
+
+        // Modal States
+        const showCreatePRModal = ref(false);
+        const showQuickIssueModal = ref(false);
+        const selectedProductId = ref('');
+        const newPRQty = ref(1);
+        const newPR = ref({ department: 'PD', requesterName: 'คุณวิชัย (PD)', requiredDate: '' });
+        const quickIssue = ref({ productId: '', qty: 1, issueLocation: 'ห้อง K1' });
+
+        // Computed
+        const lowStockProducts = computed(() => products.value.filter(p => Number(p.stockBalance) <= Number(p.reorderPoint)));
+        const pendingPRsCount = computed(() => prs.value.filter(p => p.status === 'SUBMITTED' || p.status === 'REVIEWED').length);
+        const canApprove = computed(() => currentRole.value === 'PLANT_MANAGER' || currentRole.value === 'ASST_MANAGER');
+        const availableProducts = computed(() => {
+          const dept = currentRole.value.includes('QC') ? 'QC' : 'PD';
+          return products.value.filter(p => p.category === dept);
+        });
+
+        // Load Data from Google Apps Script Backend
+        const loadInitialData = () => {
+          loading.value = true;
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(data => {
+                products.value = data.products || [];
+                vendors.value = data.vendors || [];
+                storageLocations.value = data.storageLocations || [];
+                prs.value = data.prs || [];
+                pos.value = data.pos || [];
+                stockLogs.value = data.stockLogs || [];
+                budgets.value = data.budgets || [];
+                loading.value = false;
+              })
+              .withFailureHandler(err => {
+                alert('เชื่อมต่อไม่สำเร็จ: ' + err);
+                loading.value = false;
+              })
+              .apiGetInitialData();
+          } else {
+            // Local Mock Fallback
+            setTimeout(() => {
+              products.value = [
+                { id: 'PROD-PD-001', code: 'PD-OIL-068', name: 'น้ำมันไฮดรอลิก VG 68', category: 'PD', purchaseUnit: 'ถัง (200L)', stockUnit: 'ลิตร', conversionRate: 200, price: 14500, stockBalance: 2400, reorderPoint: 1000, locationName: 'ชั้นวาง A-01' },
+                { id: 'PROD-PD-003', code: 'PD-BLT-380', name: 'สายพานลำเลียงทนความร้อน', category: 'PD', purchaseUnit: 'เส้น', stockUnit: 'เส้น', conversionRate: 1, price: 620, stockBalance: 6, reorderPoint: 8, locationName: 'ชั้นวาง A-02' }
+              ];
+              loading.value = false;
+            }, 500);
+          }
+        };
+
+        const openCreatePRModal = () => {
+          const dept = currentRole.value.includes('QC') ? 'QC' : 'PD';
+          const name = currentRole.value.includes('QC') ? 'คุณสมหญิง (QC)' : 'คุณวิชัย (PD)';
+          newPR.value = { department: dept, requesterName: name, requiredDate: '' };
+          selectedProductId.value = '';
+          newPRQty.value = 1;
+          showCreatePRModal.value = true;
+        };
+
+        const submitNewPR = () => {
+          if (!selectedProductId.value) return alert('กรุณาเลือกสินค้า');
+          const prod = products.value.find(p => p.id === selectedProductId.value);
+          const prPayload = {
+            department: newPR.value.department,
+            requesterName: newPR.value.requesterName,
+            requiredDate: newPR.value.requiredDate,
+            status: 'SUBMITTED',
+            totalAmount: (prod.price || 0) * newPRQty.value,
+            items: [{
+              productId: prod.id,
+              code: prod.code,
+              name: prod.name,
+              purchaseQty: newPRQty.value,
+              purchaseUnit: prod.purchaseUnit,
+              price: prod.price,
+              total: (prod.price || 0) * newPRQty.value
+            }]
+          };
+
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(() => {
+                showCreatePRModal.value = false;
+                loadInitialData();
+              })
+              .apiSavePR(prPayload, { name: newPR.value.requesterName });
+          } else {
+            prs.value.unshift({ id: 'PR-' + Date.now(), prNumber: 'PR-PD-2608-001', ...prPayload });
+            showCreatePRModal.value = false;
+          }
+        };
+
+        const approvePR = (prId) => {
+          if (!confirm('ยืนยันการอนุมัติ PR และสร้างใบสั่งซื้อ (PO)?')) return;
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(() => loadInitialData())
+              .apiApprovePRAndCreatePO(prId, { name: 'คุณประเสริฐ (Plant Mgr)', title: 'Approver' });
+          }
+        };
+
+        const openReceiveModal = (po) => {
+          if (!confirm(`ยืนยันการรับสินค้าทั้งหมดเข้าคลังสำหรับ ${po.poNumber}?`)) return;
+          const receivingItems = (po.items || []).map(i => ({ productId: i.productId, code: i.code, receivedThisTime: i.purchaseQty || i.orderedQty || 1 }));
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(() => loadInitialData())
+              .apiReceiveGoods(po.id, receivingItems, { name: 'Staff' }, 'ตรวจรับสินค้าเข้าคลัง');
+          }
+        };
+
+        const openQuickIssueModal = () => {
+          quickIssue.value = { productId: products.value[0]?.id || '', qty: 1, issueLocation: 'ห้อง K1' };
+          showQuickIssueModal.value = true;
+        };
+
+        const submitQuickIssue = () => {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(() => {
+                showQuickIssueModal.value = false;
+                loadInitialData();
+              })
+              .withFailureHandler(err => alert(err))
+              .apiQuickIssue(quickIssue.value, { name: 'Staff' });
+          } else {
+            showQuickIssueModal.value = false;
+          }
+        };
+
+        const printPODocument = (po) => {
+          window.print();
+        };
+
+        const viewPRDetails = (pr) => {
+          alert(`PR: ${pr.prNumber}\nยอดเงิน: ฿${(pr.totalAmount||0).toLocaleString()}\nสถานะ: ${pr.status}`);
+        };
+
+        const getPRStatusBadge = (s) => ({
+          'DRAFT': 'bg-slate-100 text-slate-600',
+          'SUBMITTED': 'bg-amber-100 text-amber-800',
+          'APPROVED': 'bg-emerald-100 text-emerald-800',
+          'REJECTED': 'bg-rose-100 text-rose-800'
+        }[s] || 'bg-slate-100 text-slate-600');
+
+        const getPOStatusBadge = (s) => ({
+          'ISSUED': 'bg-blue-100 text-blue-800',
+          'PARTIAL': 'bg-amber-100 text-amber-800',
+          'RECEIVED': 'bg-emerald-100 text-emerald-800'
+        }[s] || 'bg-slate-100 text-slate-600');
+
+        onMounted(() => {
+          loadInitialData();
+        });
+
+        return {
+          loading, activeTab, currentRole, products, vendors, storageLocations, prs, pos, stockLogs, budgets,
+          lowStockProducts, pendingPRsCount, canApprove, availableProducts,
+          showCreatePRModal, showQuickIssueModal, selectedProductId, newPRQty, newPR, quickIssue,
+          openCreatePRModal, submitNewPR, approvePR, openReceiveModal, openQuickIssueModal, submitQuickIssue,
+          printPODocument, viewPRDetails, getPRStatusBadge, getPOStatusBadge
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
