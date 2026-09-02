@@ -1,0 +1,3 @@
+# Ignore markdown and temporary files
+README.md
+*.md

@@ -10,8 +10,11 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gas:push": "clasp push --force",
+    "gas:deploy": "clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d 'Auto deployed'"
   },
+
   "dependencies": {
     "lucide-react": "^1.31.0",
     "react": "^19.2.8",

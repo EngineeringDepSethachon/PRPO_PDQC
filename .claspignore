@@ -1,0 +1,7 @@
+# Ignore everything by default
+**/*
+
+# Only include Google Apps Script files
+!Code.gs
+!appsscript.json
+!index.html
