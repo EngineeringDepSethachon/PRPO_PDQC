@@ -79,6 +79,22 @@ class GasService {
   }
 
   /**
+   * Safely parse JSON response from GAS with detection of Google Login / Permission redirects
+   */
+  async parseResponseSafe(response) {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (text.includes('accounts.google.com') || text.includes('ServiceLogin') || text.includes('Google Accounts') || text.includes('ppConfig') || text.includes('DOCTYPE html')) {
+        throw new Error('Web App ยังไม่ได้เปิดสิทธิ์ "ทุกคน (Anyone)": กรุณาเปิด Apps Script > การทำให้ใช้งานได้ (Deploy) > จัดการการทำให้ใช้งานได้ (Manage Deployments) > แก้ไข > เปลี่ยน "ผู้มีสิทธิ์เข้าถึง (Who has access)" เป็น "ทุกคน (Anyone)"');
+      }
+      throw new Error(`การตอบกลับไม่ใช่ JSON: ${text.slice(0, 100)}`);
+    }
+
+  }
+
+  /**
    * Test connection to Google Apps Script Web App (Ping Test)
    */
   async testConnection(customUrl = null) {
@@ -102,15 +118,16 @@ class GasService {
         throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = await this.parseResponseSafe(response);
       return result;
     } catch (err) {
       if (err.name === 'AbortError') {
         throw new Error('การเชื่อมต่อหมดเวลา (Timeout 15 วินาที) โปรดตรวจเช็คสิทธิ์ Web App ให้เป็น "Anyone"');
       }
-      throw new Error(`เชื่อมต่อไม่สำเร็จ: ${err.message || 'โปรดตรวจสอบ URL และสิทธิ์การ Deploy'}`);
+      throw err;
     }
   }
+
 
   /**
    * Authenticate user with Google Sheets (Users Sheet)
@@ -145,7 +162,7 @@ class GasService {
       });
       clearTimeout(timeoutId);
 
-      const result = await response.json();
+      const result = await this.parseResponseSafe(response);
       if (result.status === 'success' && result.user) {
         return result.user;
       } else {
@@ -196,7 +213,7 @@ class GasService {
       });
       clearTimeout(timeoutId);
 
-      const result = await response.json();
+      const result = await this.parseResponseSafe(response);
       if (result.status === 'success' && result.data) {
         this.setLastSyncTime();
         this.setSyncStatus('CONNECTED');
@@ -207,6 +224,7 @@ class GasService {
     } catch (err) {
       console.warn('[GasService] Pull from Google Sheets failed:', err);
       this.setSyncStatus('ERROR');
+
       throw err;
     }
   }
@@ -235,9 +253,10 @@ class GasService {
         body: JSON.stringify(bodyPayload)
       });
 
-      const result = await response.json();
+      const result = await this.parseResponseSafe(response);
       this.setLastSyncTime();
       return result;
+
     } catch (err) {
       console.warn(`[GasService] Mutation ${action} to GAS failed:`, err);
       // Non-blocking for offline resilience
