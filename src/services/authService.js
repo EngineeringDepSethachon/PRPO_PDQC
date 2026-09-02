@@ -148,6 +148,11 @@ export const authService = {
     }
   },
 
+  getCurrentUser() {
+    return this.getCurrentSession();
+  },
+
+
   // Authenticate user with Username / Password
   async login(username, password, _optionalLegacyUid = null) {
     const cleanUser = (username || '').trim().toLowerCase();
@@ -283,11 +288,12 @@ export const authService = {
     const device = getClientDeviceInfo();
 
     // Update active session
-    const current = this.getCurrentUser();
+    const current = this.getCurrentSession();
     if (current) {
       current.pdpaConsentAt = consentTime;
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(current));
     }
+
 
     // Update in registered users cache
     const users = this.getRegisteredUsers();
