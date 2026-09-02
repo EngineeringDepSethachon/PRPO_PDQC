@@ -11,9 +11,12 @@
     "test:e2e:ui": "playwright test --ui",
     "lint": "oxlint",
     "preview": "vite preview",
-    "gas:push": "clasp push --force",
-    "gas:deploy": "clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d 'Auto deployed'"
+    "gas:push": "npx --yes @google/clasp push --force",
+    "gas:deploy": "npx --yes @google/clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d \"Redeploy_same_URL\"",
+    "gas:update": "npx --yes @google/clasp push --force && npx --yes @google/clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d \"Redeploy_same_URL\""
   },
+
+
 
   "dependencies": {
     "lucide-react": "^1.31.0",
