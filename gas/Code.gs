@@ -734,11 +734,12 @@ function apiSavePdpaConsent(username, clientIp, userAgent) {
     matched.updatedAt = new Date().toISOString();
     upsertSheetRecord(ss, 'Users', matched);
 
-    apiLogAudit('PDPA_CONSENT', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `ผู้ใช้ยินยอมรับทราบนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) [IP: ${ip}]`, ip, device);
+    apiLogAudit('PDPA_CONSENT', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `ผู้ใช้ยินยอมให้บันทึกประวัติการใช้งานเฉพาะภายในระบบ PR/PO (PDPA Consent) [IP: ${ip}]`, ip, device);
     return { status: 'success', message: 'บันทึกความยินยอม PDPA เรียบร้อยแล้ว' };
   }
   return { status: 'error', message: 'ไม่พบผู้ใช้งาน' };
 }
+
 
 
 /**

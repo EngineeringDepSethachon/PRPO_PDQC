@@ -130,11 +130,12 @@ export const auditService = {
       department: user?.department || 'ALL',
       docNo: user?.employeeId || user?.username || '-',
       docType: 'SYSTEM',
-      details: `ยินยอมและรับทราบนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 [IP: ${ipAddress || getClientIpSync()}]`,
+      details: `ยินยอมให้บันทึกประวัติการใช้งานเฉพาะภายในระบบ PR/PO ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 [IP: ${ipAddress || getClientIpSync()}]`,
       ipAddress,
       userAgent
     });
   },
+
 
   /**
    * Clear all audit logs (Admin function)

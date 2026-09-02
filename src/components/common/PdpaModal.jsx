@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ShieldCheck, X, FileText, CheckCircle2, Lock, Eye, Clock, Building2 } from 'lucide-react';
+import { ShieldCheck, X, FileText, CheckCircle2, Lock, Eye, Clock, Building2, ShieldAlert } from 'lucide-react';
+
 
 export default function PdpaModal({ isOpen, onClose }) {
   if (!isOpen) return null;
@@ -59,7 +60,15 @@ export default function PdpaModal({ isOpen, onClose }) {
               <li><b>ข้อมูลการเชื่อมต่อและอุปกรณ์ (Technical Data):</b> ที่อยู่ไอพี (IP Address), วันที่และเวลาที่เข้าใช้งาน, ประเภทอุปกรณ์ (Device), และเว็บเบราว์เซอร์</li>
               <li><b>ประวัติการทำรายการ (Audit Trail Logs):</b> รายละเอียดการสร้างใบขอซื้อ (PR), การอนุมัติใบสั่งซื้อ (PO), การตรวจรับสินค้าเข้าสต็อก, การเบิกจ่ายสินค้า, และการลงลายเซ็นอิเล็กทรอนิกส์</li>
             </ul>
+
+            <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 flex items-start gap-2 mt-2">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">
+                <b>ขอบเขตความคุ้มครองข้อมูล:</b> ระบบจะจัดเก็บและบันทึกประวัติการเข้าสู่ระบบ วันที่-เวลา และกิจกรรม<b>เฉพาะที่เกิดขึ้นภายในระบบ PR/PO & Inventory นี้เท่านั้น</b> ทางระบบ<b>ไม่มีการเข้าถึงหรือจัดเก็บประวัติการใช้งานภายนอก เว็บไซต์อื่น หรือข้อมูลส่วนบุคคลอื่นใดในเครื่องของท่านทั้งสิ้น</b>
+              </span>
+            </div>
           </div>
+
 
           {/* Section 2 */}
           <div className="space-y-2">

@@ -162,11 +162,12 @@ export default function LoginView({ onLoginSuccess }) {
                 )}
               </button>
               <span className="text-[11px] text-slate-300 leading-snug">
-                ข้าพเจ้ายินยอมให้ระบบบันทึกข้อมูลส่วนบุคคล, ประวัติการเข้าใช้งาน, 
+                ข้าพเจ้ายินยอมให้ระบบบันทึกข้อมูลส่วนบุคคล, วัน-เวลาเข้าสู่ระบบ, 
                 ที่อยู่ IP เครื่อง (<span className="font-mono text-indigo-400">{clientIp}</span>) 
-                และประวัติการทำรายการเพื่อการตรวจสอบตาม <b>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)</b>
+                และประวัติการทำรายการ<b className="text-indigo-300 font-bold">เฉพาะภายในระบบ PR/PO นี้เท่านั้น (มิได้มีการเก็บประวัติการใช้งานอื่นภายนอกระบบ)</b> เพื่อการตรวจสอบตาม <b>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)</b>
               </span>
             </label>
+
             <div className="text-right">
               <button
                 type="button"
