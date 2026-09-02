@@ -104,4 +104,42 @@ describe('Scenario 2: PR Lifecycle & Workflow Transitions', () => {
     // Asst Manager can now review the resubmitted PR
     expect(workflowEngine.canAction(ROLES.ASST_MANAGER, updatedPR)).toBe(true);
   });
+
+  it('Newly created PR is preserved after GAS sync with empty or partial remote data', async () => {
+    // 1. Requester creates a new PR
+    const newPR = await workflowEngine.createPR({
+      department: 'QC',
+      items: [{ productId: 'P-QC-TEST', qty: 3, price: 1200, name: 'น้ำยาเคมี' }],
+      totalAmount: 3600
+    }, ROLES.REQUESTER_QC, false);
+
+    expect(newPR).toBeDefined();
+    expect(newPR.prNo).toMatch(/^QC\d{3}\/\d{4}$/);
+
+    // 2. Simulate GAS sync where remote returns empty array (e.g. fresh sheet)
+    storageService.loadFromGAS({ prs: [] });
+
+    // 3. Verify local PR is NOT wiped out
+    const prsAfterEmptySync = storageService.getPRs();
+    expect(prsAfterEmptySync.length).toBeGreaterThan(0);
+    expect(prsAfterEmptySync.some(p => p.id === newPR.id || p.prNo === newPR.prNo)).toBe(true);
+
+    // 4. Simulate GAS sync where remote returns existing PR plus another PR
+    const remotePR = {
+      id: 'PR-REMOTE-001',
+      prNumber: 'PD999/2026',
+      department: 'PD',
+      requester: 'คุณสมชาย',
+      status: 'APPROVED',
+      totalAmount: 15000,
+      items: []
+    };
+    storageService.loadFromGAS({ prs: [remotePR] });
+
+    // 5. Verify BOTH the newly created local PR and remote PR exist in merged list
+    const prsAfterMerge = storageService.getPRs();
+    expect(prsAfterMerge.some(p => p.id === newPR.id || p.prNo === newPR.prNo)).toBe(true);
+    expect(prsAfterMerge.some(p => p.prNo === 'PD999/2026')).toBe(true);
+  });
 });
+

@@ -48,18 +48,11 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Initialize Data
-  const refreshData = async () => {
+  // Initialize Data: Load local state immediately (0ms UI latency), then merge with GAS
+  const refreshData = async (skipGasSync = false) => {
     storageService.init();
-    
-    // Auto-sync from Google Sheets if configured
-    if (apiService.getGasService().isConfigured()) {
-      try {
-        await apiService.syncFromGAS();
-      } catch (e) {
-        console.warn('[App] Initial GAS sync skipped or offline:', e);
-      }
-    }
 
+    // 1. Instantly read local storage so the UI updates immediately
     const p = await apiService.getProducts();
     const v = await apiService.getVendors();
     const locs = await apiService.getStorageLocations();
@@ -75,6 +68,25 @@ export default function App() {
     setPOs(po);
     setStockLogs(log);
     setBudgetSummary(b);
+
+    // 2. Sync from Google Sheets if configured (without clobbering local changes)
+    if (!skipGasSync && apiService.getGasService().isConfigured()) {
+      try {
+        const gasData = await apiService.syncFromGAS();
+        if (gasData) {
+          // Re-read merged data into state
+          setProducts(await apiService.getProducts());
+          setVendors(await apiService.getVendors());
+          setStorageLocations(await apiService.getStorageLocations());
+          setPRs(await apiService.getPRs());
+          setPOs(await apiService.getPOs());
+          setStockLogs(await apiService.getStockLogs());
+          setBudgetSummary(apiService.calculateBudgetSummary());
+        }
+      } catch (e) {
+        console.warn('[App] GAS sync skipped or offline:', e);
+      }
+    }
   };
 
 

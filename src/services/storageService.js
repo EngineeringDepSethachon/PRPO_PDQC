@@ -497,22 +497,85 @@ export const storageService = {
     if (data.storageLocations && Array.isArray(data.storageLocations) && data.storageLocations.length > 0) {
       localStorage.setItem(STORAGE_KEYS.STORAGE_LOCATIONS, JSON.stringify(data.storageLocations));
     }
+    
+    // Intelligent merge for PRs: NEVER wipe local PRs if GAS is empty or missing newly created local PRs
     if (data.prs && Array.isArray(data.prs)) {
-      localStorage.setItem(STORAGE_KEYS.PRS, JSON.stringify(data.prs));
+      const localPRs = this.getPRs();
+      if (data.prs.length === 0 && localPRs.length > 0) {
+        // Keep local PRs intact when remote is empty
+      } else {
+        const gasPRs = data.prs.map(p => ({
+          ...p,
+          prNo: p.prNo || p.prNumber,
+          prNumber: p.prNumber || p.prNo,
+          requestedBy: p.requestedBy || p.requesterName || p.requester || 'Requester',
+          requestedDate: p.requestedDate || p.createdAt || p.requestDate || ''
+        }));
+        const mergedPRs = [...gasPRs];
+        // Preserve any local PR not yet in GAS
+        localPRs.forEach(lp => {
+          const exists = mergedPRs.some(gp => 
+            (gp.id && gp.id === lp.id) || 
+            (gp.prNo && gp.prNo === (lp.prNo || lp.prNumber)) || 
+            (gp.prNumber && gp.prNumber === (lp.prNumber || lp.prNo))
+          );
+          if (!exists) {
+            mergedPRs.unshift(lp);
+          }
+        });
+        localStorage.setItem(STORAGE_KEYS.PRS, JSON.stringify(mergedPRs));
+      }
     }
+
+    // Intelligent merge for POs: NEVER wipe local POs if GAS is empty or missing newly created local POs
     if (data.pos && Array.isArray(data.pos)) {
-      localStorage.setItem(STORAGE_KEYS.POS, JSON.stringify(data.pos));
+      const localPOs = this.getPOs();
+      if (data.pos.length === 0 && localPOs.length > 0) {
+        // Keep local POs intact
+      } else {
+        const gasPOs = data.pos.map(p => ({
+          ...p,
+          poNo: p.poNo || p.poNumber,
+          poNumber: p.poNumber || p.poNo
+        }));
+        const mergedPOs = [...gasPOs];
+        localPOs.forEach(lp => {
+          const exists = mergedPOs.some(gp => 
+            (gp.id && gp.id === lp.id) || 
+            (gp.poNo && gp.poNo === (lp.poNo || lp.poNumber)) || 
+            (gp.poNumber && gp.poNumber === (lp.poNumber || lp.poNo))
+          );
+          if (!exists) {
+            mergedPOs.unshift(lp);
+          }
+        });
+        localStorage.setItem(STORAGE_KEYS.POS, JSON.stringify(mergedPOs));
+      }
     }
+
+    // Intelligent merge for StockLogs
     if (data.stockLogs && Array.isArray(data.stockLogs)) {
-      localStorage.setItem(STORAGE_KEYS.STOCK_LOGS, JSON.stringify(data.stockLogs));
+      const localLogs = this.getStockLogs();
+      if (data.stockLogs.length === 0 && localLogs.length > 0) {
+        // Keep local stock logs intact
+      } else {
+        const mergedLogs = [...data.stockLogs];
+        localLogs.forEach(ll => {
+          if (!mergedLogs.some(gl => gl.id === ll.id)) {
+            mergedLogs.unshift(ll);
+          }
+        });
+        localStorage.setItem(STORAGE_KEYS.STOCK_LOGS, JSON.stringify(mergedLogs));
+      }
     }
-    if (data.budgets && typeof data.budgets === 'object') {
+
+    if (data.budgets && typeof data.budgets === 'object' && Object.keys(data.budgets).length > 0) {
       localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(data.budgets));
     }
-    if (data.auditLogs && Array.isArray(data.auditLogs)) {
+    if (data.auditLogs && Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
       localStorage.setItem('prpo_audit_logs', JSON.stringify(data.auditLogs));
     }
-    if (data.notifications && Array.isArray(data.notifications)) {
+    if (data.notifications && Array.isArray(data.notifications) && data.notifications.length > 0) {
       localStorage.setItem('prpo_notifications', JSON.stringify(data.notifications));
     }
     if (data.users && Array.isArray(data.users) && data.users.length > 0) {

@@ -17,12 +17,17 @@ const PR_TABS = [
 export default function PRListView({ prs = [], currentRole, onRefresh, onNavigate, onEditPR }) {
   const [selectedPR, setSelectedPR] = useState(null);
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [deptFilter, setDeptFilter] = useState(currentRole.canViewAllDepts ? 'ALL' : currentRole.department);
+  const [deptFilter, setDeptFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Department-based access check (allows switching departments via filter)
   const accessiblePRs = useMemo(() => {
-    return prs || [];
+    return (prs || []).map(p => ({
+      ...p,
+      prNo: p.prNo || p.prNumber,
+      requestedBy: p.requestedBy || p.requesterName || p.requester || 'Requester',
+      requestedDate: p.requestedDate || p.createdAt || p.requestDate || ''
+    }));
   }, [prs]);
 
 

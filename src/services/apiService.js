@@ -88,33 +88,88 @@ export const apiService = {
     return workflowEngine.isOverBudget(department, amount);
   },
 
+  // Helper to format PR for GAS schema
+  _formatPRForGAS(pr) {
+    if (!pr) return null;
+    return {
+      ...pr,
+      prNumber: pr.prNo || pr.prNumber,
+      prNo: pr.prNo || pr.prNumber,
+      requester: pr.requestedBy || 'Requester',
+      requesterName: pr.requestedBy || 'Requester',
+      requestDate: pr.requestedDate || pr.createdAt || new Date().toISOString(),
+      remarks: pr.note || '',
+      memoData: pr.memo || null
+    };
+  },
+
   // --- PR Operations ---
   async createPR(prData, user, isDraft = false) {
-    return workflowEngine.createPR(prData, user, isDraft);
+    const newPR = await workflowEngine.createPR(prData, user, isDraft);
+    // Background sync to GAS
+    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(newPR) }, user).catch(err => {
+      console.warn('[ApiService] Background savePR to GAS failed:', err);
+    });
+    return newPR;
   },
 
   async updatePR(prId, prData, user, isDraft = false) {
-    return workflowEngine.updatePR(prId, prData, user, isDraft);
+    const updatedPR = await workflowEngine.updatePR(prId, prData, user, isDraft);
+    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(updatedPR) }, user).catch(err => {
+      console.warn('[ApiService] Background savePR update to GAS failed:', err);
+    });
+    return updatedPR;
   },
 
   async submitPR(prId, user, memoData = null) {
-    return workflowEngine.submitPR(prId, user, memoData);
+    const res = await workflowEngine.submitPR(prId, user, memoData);
+    if (res) {
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user).catch(err => {
+        console.warn('[ApiService] Background savePR submit to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async updatePRStatus(prId, nextStatus, user, note = '') {
-    return workflowEngine.updatePRStatus(prId, nextStatus, user, note);
+    const res = await workflowEngine.updatePRStatus(prId, nextStatus, user, note);
+    const pr = res?.pr || res;
+    if (pr && (pr.prNo || pr.prNumber)) {
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(pr) }, user).catch(err => {
+        console.warn('[ApiService] Background savePR status update to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async rejectPR(prId, user, reason) {
-    return workflowEngine.rejectPR(prId, user, reason);
+    const res = await workflowEngine.rejectPR(prId, user, reason);
+    if (res && (res.prNo || res.prNumber)) {
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user).catch(err => {
+        console.warn('[ApiService] Background savePR reject to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async editPRItems(prId, items, user, reason = '') {
-    return workflowEngine.editPRItems(prId, items, user, reason);
+    const res = await workflowEngine.editPRItems(prId, items, user, reason);
+    if (res && (res.prNo || res.prNumber)) {
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user).catch(err => {
+        console.warn('[ApiService] Background savePR editItems to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async cancelPR(prId, user, reason) {
-    return workflowEngine.cancelPR(prId, user, reason);
+    const res = await workflowEngine.cancelPR(prId, user, reason);
+    if (res && (res.prNo || res.prNumber)) {
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user).catch(err => {
+        console.warn('[ApiService] Background savePR cancel to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async cancelPO(poId, user, reason) {

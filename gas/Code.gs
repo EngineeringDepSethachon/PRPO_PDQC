@@ -323,11 +323,22 @@ function apiGetInitialData() {
     }
   });
 
+  const rawPRs = getSheetRecords(ss, 'PRs', ['items', 'memoData']);
+  const formattedPRs = rawPRs.map(pr => ({
+    ...pr,
+    prNo: pr.prNumber || pr.prNo,
+    prNumber: pr.prNumber || pr.prNo,
+    requestedBy: pr.requesterName || pr.requester || pr.requestedBy || 'Requester',
+    requestedDate: pr.requestDate || pr.createdAt || pr.requestedDate || '',
+    note: pr.remarks || pr.note || '',
+    memo: pr.memoData || pr.memo || null
+  }));
+
   return {
     products: getSheetRecords(ss, 'Products'),
     vendors: getSheetRecords(ss, 'Vendors'),
     storageLocations: getSheetRecords(ss, 'StorageLocations'),
-    prs: getSheetRecords(ss, 'PRs', ['items', 'memoData']),
+    prs: formattedPRs,
     pos: getSheetRecords(ss, 'POs', ['items', 'claims']),
     stockLogs: getSheetRecords(ss, 'StockLogs'),
     budgets: getBudgetsObject(ss),
@@ -416,6 +427,12 @@ function apiSavePR(prData, user) {
     if (!prData.id) prData.id = 'PR-' + Date.now();
     prData.updatedAt = new Date().toISOString();
     if (!prData.createdAt) prData.createdAt = new Date().toISOString();
+
+    if (!prData.requester) prData.requester = prData.requestedBy || user?.name || 'Requester';
+    if (!prData.requesterName) prData.requesterName = prData.requestedBy || user?.name || 'Requester';
+    if (!prData.requestDate) prData.requestDate = prData.requestedDate || prData.createdAt;
+    if (!prData.remarks) prData.remarks = prData.note || '';
+    if (!prData.memoData) prData.memoData = prData.memo || null;
 
     upsertSheetRecord(ss, 'PRs', prData, ['items', 'memoData']);
     

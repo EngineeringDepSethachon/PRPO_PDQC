@@ -542,7 +542,9 @@ export default function PRCreateView({
         modalService.success(isDraft ? 'บันทึกแบบร่างสำเร็จ' : 'สร้างและยื่นส่งใบขอซื้อ (PR) สำเร็จ');
       }
 
-      onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
       onNavigate('pr-list');
     } catch (err) {
       modalService.error(editingPR ? 'เกิดข้อผิดพลาดในการแก้ไข PR' : 'เกิดข้อผิดพลาดในการสร้าง PR', err.message);
