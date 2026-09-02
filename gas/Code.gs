@@ -314,14 +314,14 @@ function apiGetInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const users = getSheetRecords(ss, 'Users');
 
-  // Auto-sync missing default users into Users sheet
-  DEFAULT_MASTER_USERS.forEach(mu => {
-    if (!users.some(u => String(u.username || '').toLowerCase() === mu.username.toLowerCase())) {
-      const record = { ...mu, updatedAt: new Date().toISOString() };
+  // Only seed default users if the Users sheet is completely empty (first-time initialization)
+  if (users.length === 0) {
+    DEFAULT_MASTER_USERS.forEach(mu => {
+      const record = { ...mu, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       upsertSheetRecord(ss, 'Users', record);
       users.push(record);
-    }
-  });
+    });
+  }
 
   const rawPRs = getSheetRecords(ss, 'PRs', ['items', 'memoData']);
   const formattedPRs = rawPRs.map(pr => ({
@@ -761,41 +761,41 @@ function apiLoginUser(username, password, clientIp, userAgent) {
   }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const users = getSheetRecords(ss, 'Users');
-  const cleanUser = String(username).trim().toLowerCase();
+  const cleanUser = String(username || '').trim().toLowerCase();
+  const cleanPass = String(password || '').trim();
   const ip = clientIp || '127.0.0.1';
   const device = userAgent || 'Web Browser';
 
-  let matched = users.find(u => 
-    (String(u.username || '').toLowerCase() === cleanUser || String(u.employeeId || '').toLowerCase() === cleanUser) &&
-    String(u.password) === String(password)
-  );
-
-  // Fallback to default master users if not yet written to Users sheet
-  if (!matched) {
-    const defaultMatch = DEFAULT_MASTER_USERS.find(du =>
-      (String(du.username || '').toLowerCase() === cleanUser || String(du.employeeId || '').toLowerCase() === cleanUser) &&
-      String(du.password) === String(password)
-    );
-    if (defaultMatch) {
-      matched = { ...defaultMatch, createdAt: new Date().toISOString() };
-      upsertSheetRecord(ss, 'Users', matched);
-    }
+  // If Users sheet is 100% empty, seed initial defaults once
+  let userList = users;
+  if (userList.length === 0) {
+    DEFAULT_MASTER_USERS.forEach(mu => {
+      const record = { ...mu, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      upsertSheetRecord(ss, 'Users', record);
+      userList.push(record);
+    });
   }
+
+  // Find user by username or employeeId, matching password exactly (trimmed string comparison)
+  const matched = userList.find(u => 
+    (String(u.username || '').trim().toLowerCase() === cleanUser || String(u.employeeId || '').trim().toLowerCase() === cleanUser) &&
+    String(u.password || '').trim() === cleanPass
+  );
 
   if (!matched) {
     return { status: 'error', message: 'ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง' };
   }
 
-
-  if (matched.status && matched.status !== 'ACTIVE') {
+  if (matched.status && String(matched.status).trim().toUpperCase() !== 'ACTIVE') {
     return { status: 'error', message: 'บัญชีผู้ใช้งานนี้ถูกระงับการใช้งานชั่วคราว' };
   }
 
-  // Update lastLogin timestamp & IP in sheet
-  matched.lastLoginAt = new Date().toISOString();
-  matched.lastLoginIp = ip;
-  matched.updatedAt = new Date().toISOString();
-  upsertSheetRecord(ss, 'Users', matched);
+  // Update ONLY lastLogin timestamp & IP in sheet (NEVER overwrite password or user profile with default)
+  try {
+    updateUserLoginTimestamp(ss, matched.id || matched.username, ip);
+  } catch (err) {
+    console.warn('Failed to update login timestamp in sheet:', err);
+  }
 
   // Record audit log with IP address and device info
   apiLogAudit('USER_LOGIN', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `เข้าสู่ระบบสำเร็จ (${matched.username}) [IP: ${ip}]`, ip, device);
@@ -821,17 +821,72 @@ function apiSavePdpaConsent(username, clientIp, userAgent) {
   const ip = clientIp || '127.0.0.1';
   const device = userAgent || 'Web Browser';
 
-  const matched = users.find(u => String(u.username || '').toLowerCase() === cleanUser);
+  const matched = users.find(u => String(u.username || '').trim().toLowerCase() === cleanUser);
   if (matched) {
-    matched.pdpaConsentAt = new Date().toISOString();
-    matched.lastLoginIp = ip;
-    matched.updatedAt = new Date().toISOString();
-    upsertSheetRecord(ss, 'Users', matched);
+    try {
+      updateUserPdpaConsent(ss, matched.username, ip);
+    } catch (err) {
+      console.warn('Failed to update PDPA timestamp in sheet:', err);
+    }
 
     apiLogAudit('PDPA_CONSENT', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `ผู้ใช้ยินยอมให้บันทึกประวัติการใช้งานเฉพาะภายในระบบ PR/PO (PDPA Consent) [IP: ${ip}]`, ip, device);
     return { status: 'success', message: 'บันทึกความยินยอม PDPA เรียบร้อยแล้ว' };
   }
   return { status: 'error', message: 'ไม่พบผู้ใช้งาน' };
+}
+
+/**
+ * อัปเดตเฉพาะ Timestamp และ IP ตอน Login ในตาราง Users โดยไม่แตะต้องรหัสผ่านหรือข้อมูลอื่น
+ */
+function updateUserLoginTimestamp(ss, idOrUsername, ip) {
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const idIdx = headers.indexOf('id');
+  const userIdx = headers.indexOf('username');
+  const lastLoginAtIdx = headers.indexOf('lastLoginAt');
+  const lastLoginIpIdx = headers.indexOf('lastLoginIp');
+  const updatedAtIdx = headers.indexOf('updatedAt');
+
+  for (let r = 1; r < values.length; r++) {
+    const rowId = idIdx !== -1 ? String(values[r][idIdx]) : '';
+    const rowUser = userIdx !== -1 ? String(values[r][userIdx]).toLowerCase() : '';
+    if (rowId === String(idOrUsername) || (rowUser && rowUser === String(idOrUsername).toLowerCase())) {
+      const rowNum = r + 1;
+      const nowStr = new Date().toISOString();
+      if (lastLoginAtIdx !== -1) sheet.getRange(rowNum, lastLoginAtIdx + 1).setValue(nowStr);
+      if (lastLoginIpIdx !== -1) sheet.getRange(rowNum, lastLoginIpIdx + 1).setValue(ip);
+      if (updatedAtIdx !== -1) sheet.getRange(rowNum, updatedAtIdx + 1).setValue(nowStr);
+      break;
+    }
+  }
+}
+
+/**
+ * อัปเดตเฉพาะสถานะ PDPA Consent และ IP ในตาราง Users โดยไม่แตะต้องรหัสผ่านหรือข้อมูลอื่น
+ */
+function updateUserPdpaConsent(ss, username, ip) {
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const userIdx = headers.indexOf('username');
+  const pdpaIdx = headers.indexOf('pdpaConsentAt');
+  const ipIdx = headers.indexOf('lastLoginIp');
+  const updatedAtIdx = headers.indexOf('updatedAt');
+
+  for (let r = 1; r < values.length; r++) {
+    const rowUser = userIdx !== -1 ? String(values[r][userIdx]).toLowerCase() : '';
+    if (rowUser === String(username).toLowerCase()) {
+      const rowNum = r + 1;
+      const nowStr = new Date().toISOString();
+      if (pdpaIdx !== -1) sheet.getRange(rowNum, pdpaIdx + 1).setValue(nowStr);
+      if (ipIdx !== -1) sheet.getRange(rowNum, ipIdx + 1).setValue(ip);
+      if (updatedAtIdx !== -1) sheet.getRange(rowNum, updatedAtIdx + 1).setValue(nowStr);
+      break;
+    }
+  }
 }
 
 

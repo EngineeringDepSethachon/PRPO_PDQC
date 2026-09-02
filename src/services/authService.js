@@ -199,19 +199,16 @@ export const DEFAULT_EMPLOYEE_ACCOUNTS = [
 ];
 
 export const authService = {
-  // Get all registered accounts (auto-merges new default accounts)
+  // Get all registered accounts (respects custom accounts from Google Sheets)
   getRegisteredUsers() {
     try {
       const data = localStorage.getItem(REGISTERED_USERS_KEY);
       if (!data) return DEFAULT_EMPLOYEE_ACCOUNTS;
       const parsed = JSON.parse(data);
-      const merged = Array.isArray(parsed) ? [...parsed] : [];
-      DEFAULT_EMPLOYEE_ACCOUNTS.forEach(defUser => {
-        if (!merged.some(u => u.username?.toLowerCase() === defUser.username.toLowerCase())) {
-          merged.push(defUser);
-        }
-      });
-      return merged;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      return DEFAULT_EMPLOYEE_ACCOUNTS;
     } catch {
       return DEFAULT_EMPLOYEE_ACCOUNTS;
     }
