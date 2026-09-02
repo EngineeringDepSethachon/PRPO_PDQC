@@ -126,6 +126,20 @@ export default function App() {
   };
 
   const handleNavigate = (view) => {
+    if (view === 'audit-logs') {
+      const isAdmin = Boolean(
+        currentRole?.canViewAuditLogs ||
+        currentRole?.id === 'ADMIN' || 
+        currentRole?.roleId === 'ADMIN' || 
+        currentRole?.positionKey === 'ADMIN' || 
+        currentRole?.role === 'ADMIN' || 
+        Number(currentRole?.level) >= 99
+      );
+      if (!isAdmin) {
+        setActiveView('dashboard');
+        return;
+      }
+    }
     if (view !== 'pr-create') {
       setEditingPR(null);
       setPreselectedProduct(null);

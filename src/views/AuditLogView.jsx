@@ -12,7 +12,28 @@ export default function AuditLogView({ currentRole }) {
   const [selectedAction, setSelectedAction] = useState('ALL');
   const [selectedUser, setSelectedUser] = useState('ALL');
 
-  const isAdmin = currentRole?.id === 'ADMIN' || currentRole?.roleId === 'ADMIN' || Number(currentRole?.level) >= 99;
+  const isAdmin = Boolean(
+    currentRole?.canViewAuditLogs ||
+    currentRole?.id === 'ADMIN' || 
+    currentRole?.roleId === 'ADMIN' || 
+    currentRole?.positionKey === 'ADMIN' || 
+    currentRole?.role === 'ADMIN' || 
+    Number(currentRole?.level) >= 99
+  );
+
+  if (!isAdmin) {
+    return (
+      <div className="w-full py-16 px-4 flex flex-col items-center justify-center text-center animate-fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mb-4 shadow-sm">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">ไม่มีสิทธิ์เข้าถึงข้อมูล</h3>
+        <p className="text-sm text-slate-500 max-w-md mt-1">
+          ประวัติการใช้งานและบันทึก IP Log สงวนสิทธิ์เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นในการเข้าดู
+        </p>
+      </div>
+    );
+  }
 
   // Extract unique users and actions for filters
   const uniqueUsers = useMemo(() => {

@@ -15,6 +15,14 @@ export default function Sidebar({
   onCloseMobile = () => {}
 }) {
   const isOnlinePurchaser = currentRole?.roleId === 'ONLINE_PURCHASER' || currentRole?.id === 'ONLINE_PURCHASER';
+  const isAdmin = Boolean(
+    currentRole?.canViewAuditLogs ||
+    currentRole?.id === 'ADMIN' || 
+    currentRole?.roleId === 'ADMIN' || 
+    currentRole?.positionKey === 'ADMIN' || 
+    currentRole?.role === 'ADMIN' || 
+    Number(currentRole?.level) >= 99
+  );
 
   // Calculate Task Counts for Badges (using unified workflowEngine task aggregator)
   const taskCounts = React.useMemo(() => {
@@ -32,7 +40,7 @@ export default function Sidebar({
     { id: 'quick-issue', label: 'เบิกใช้งาน', icon: SendToBack, visible: !isOnlinePurchaser },
     { id: 'budget', label: 'งบประมาณ', icon: Wallet, visible: !isOnlinePurchaser && currentRole.canViewBudget },
     { id: 'master-data', label: 'ข้อมูลหลัก', icon: Database, visible: !isOnlinePurchaser && currentRole.canManageMaster },
-    { id: 'audit-logs', label: 'ประวัติ & IP Log', icon: ShieldCheck, visible: !isOnlinePurchaser && (currentRole.canManageMaster || Number(currentRole.level) >= 2) }
+    { id: 'audit-logs', label: 'ประวัติ & IP Log', icon: ShieldCheck, visible: isAdmin }
   ];
 
 

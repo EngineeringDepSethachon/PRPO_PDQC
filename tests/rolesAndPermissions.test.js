@@ -123,4 +123,20 @@ describe('Scenario 1: Roles & Permission Matrix', () => {
     expect(workflowEngine.canCancelPR(ROLES.PLANT_MANAGER, approvedPR)).toBe(false);
     expect(workflowEngine.canCancelPR(ROLES.ADMIN, approvedPR)).toBe(false);
   });
+
+  it('Audit & IP Log Visibility: Only Admin (Level 99) can view Audit Logs and IP Logs', () => {
+    // Non-admin roles CANNOT view Audit & IP Logs
+    expect(ROLES.REQUESTER.canViewAuditLogs).toBe(false);
+    expect(ROLES.REVIEWER.canViewAuditLogs).toBe(false);
+    expect(ROLES.APPROVER.canViewAuditLogs).toBe(false);
+    expect(ROLES.ONLINE_PURCHASER.canViewAuditLogs).toBe(false);
+    expect(ROLES.REQUESTER_PD.canViewAuditLogs).toBe(false);
+    expect(ROLES.REQUESTER_QC.canViewAuditLogs).toBe(false);
+    expect(ROLES.ASST_MANAGER.canViewAuditLogs).toBe(false);
+    expect(ROLES.PLANT_MANAGER.canViewAuditLogs).toBe(false);
+
+    // Only ADMIN has canViewAuditLogs = true
+    expect(ROLES.ADMIN.canViewAuditLogs).toBe(true);
+  });
 });
+

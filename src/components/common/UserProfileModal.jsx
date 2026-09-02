@@ -20,6 +20,15 @@ export default function UserProfileModal({ isOpen, onClose, currentRole, onLogou
 
   if (!isOpen || !currentRole) return null;
 
+  const isAdmin = Boolean(
+    currentRole?.canViewAuditLogs ||
+    currentRole?.id === 'ADMIN' || 
+    currentRole?.roleId === 'ADMIN' || 
+    currentRole?.positionKey === 'ADMIN' || 
+    currentRole?.role === 'ADMIN' || 
+    Number(currentRole?.level) >= 99
+  );
+
   const currentIp = currentRole.lastLoginIp || getClientIpSync();
   const currentDevice = currentRole.deviceInfo || getClientDeviceInfo();
 
@@ -41,10 +50,10 @@ export default function UserProfileModal({ isOpen, onClose, currentRole, onLogou
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                ข้อมูลผู้ใช้งานและประวัติกิจกรรม (Profile & History)
+                {isAdmin ? 'ข้อมูลผู้ใช้งานและประวัติกิจกรรม (Profile & History)' : 'ข้อมูลผู้ใช้งานและสิทธิ์ในระบบ (User Profile)'}
               </h3>
               <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
-                สิทธิ์การทำงาน, ที่อยู่ IP, และบันทึกประวัติการเข้าใช้งานตาม PDPA
+                {isAdmin ? 'สิทธิ์การทำงาน, ที่อยู่ IP, และบันทึกประวัติการเข้าใช้งานตาม PDPA' : 'ข้อมูลตำแหน่งงาน แผนก และสิทธิ์การทำงานตามบทบาท'}
               </p>
             </div>
           </div>
@@ -58,33 +67,35 @@ export default function UserProfileModal({ isOpen, onClose, currentRole, onLogou
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="shrink-0 px-6 pt-3 bg-slate-50/50 border-b border-slate-100 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('info')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'info'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>ข้อมูลสิทธิ์ & อุปกรณ์</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('history')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'history'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>ประวัติกิจกรรมของฉัน & บันทึก IP ({userLogs.length})</span>
-          </button>
-        </div>
+        {/* ── 1.1 Tabs (Only show multiple tabs if Admin) ── */}
+        {isAdmin && (
+          <div className="flex border-b border-slate-200 px-6 shrink-0 bg-white">
+            <button
+              type="button"
+              onClick={() => setActiveTab('info')}
+              className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'info'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>ข้อมูลสิทธิ์ & อุปกรณ์</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'history'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>ประวัติกิจกรรมของฉัน & บันทึก IP ({userLogs.length})</span>
+            </button>
+          </div>
+        )}
 
         {/* ── 2. Scrollable Content Body ── */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 custom-scrollbar bg-slate-50/30">
@@ -123,32 +134,38 @@ export default function UserProfileModal({ isOpen, onClose, currentRole, onLogou
                 </div>
               </div>
 
-              {/* IP Address & Technical Security Card */}
+              {/* Security & PDPA Consent Card */}
               <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
                     <Globe className="w-4 h-4 text-emerald-400 animate-pulse" />
-                    <span>ข้อมูลการเชื่อมต่อและที่อยู่ IP (Network & Device)</span>
+                    <span>{isAdmin ? 'ข้อมูลการเชื่อมต่อและที่อยู่ IP (Network & Device)' : 'ข้อมูลความปลอดภัยตาม พ.ร.บ. PDPA'}</span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-semibold">
                     บันทึกตาม PDPA
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                  <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                    <div className="text-[10px] text-slate-400 font-medium">ที่อยู่ IP ล่าสุด:</div>
-                    <div className="font-mono font-bold text-sm text-emerald-400 mt-0.5">
-                      {currentIp}
+                {isAdmin ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                      <div className="text-[10px] text-slate-400 font-medium">ที่อยู่ IP ล่าสุด:</div>
+                      <div className="font-mono font-bold text-sm text-emerald-400 mt-0.5">
+                        {currentIp}
+                      </div>
+                    </div>
+                    <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                      <div className="text-[10px] text-slate-400 font-medium">อุปกรณ์ / เบราว์เซอร์:</div>
+                      <div className="font-medium text-slate-200 truncate mt-0.5">
+                        {currentDevice}
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                    <div className="text-[10px] text-slate-400 font-medium">อุปกรณ์ / เบราว์เซอร์:</div>
-                    <div className="font-medium text-slate-200 truncate mt-0.5">
-                      {currentDevice}
-                    </div>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    ระบบได้บันทึกความยินยอมตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 และจัดเก็บประวัติการเข้าใช้งานอย่างปลอดภัย โดยบันทึก IP Log สงวนสิทธิ์การเข้าดูเฉพาะผู้ดูแลระบบ (Admin)
+                  </p>
+                )}
 
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-indigo-200/90">
                   <span className="flex items-center gap-1.5">
@@ -207,8 +224,8 @@ export default function UserProfileModal({ isOpen, onClose, currentRole, onLogou
             </div>
           )}
 
-          {/* TAB 2: User Activity History & IP Logs */}
-          {activeTab === 'history' && (
+          {/* TAB 2: User Activity History & IP Logs (Admin Only) */}
+          {activeTab === 'history' && isAdmin && (
             <div className="space-y-3 animate-fade-in">
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-bold text-slate-700">

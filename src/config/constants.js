@@ -21,6 +21,7 @@ export const ROLES = {
     canViewBudgetMenu: false,
     canSetBudget: false,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 1,
   },
   REVIEWER: {
@@ -42,6 +43,7 @@ export const ROLES = {
     canViewBudgetMenu: true,
     canSetBudget: false,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 2,
   },
   APPROVER: {
@@ -63,6 +65,7 @@ export const ROLES = {
     canViewBudgetMenu: true,
     canSetBudget: true,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 3,
   },
   ONLINE_PURCHASER: {
@@ -84,6 +87,7 @@ export const ROLES = {
     canViewBudgetMenu: false,
     canSetBudget: false,
     canOnlinePurchase: true, // รับ Task Online, Update Actual Price, ปิด PO Online
+    canViewAuditLogs: false,
     level: 2,
   },
   ADMIN: {
@@ -105,6 +109,7 @@ export const ROLES = {
     canViewBudgetMenu: true,
     canSetBudget: true,
     canOnlinePurchase: true,
+    canViewAuditLogs: true,
     level: 99,
   },
 
@@ -128,6 +133,7 @@ export const ROLES = {
     canViewBudgetMenu: false,
     canSetBudget: false,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 1,
   },
   REQUESTER_QC: {
@@ -149,6 +155,7 @@ export const ROLES = {
     canViewBudgetMenu: false,
     canSetBudget: false,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 1,
   },
   ASST_MANAGER: {
@@ -170,6 +177,7 @@ export const ROLES = {
     canViewBudgetMenu: true,
     canSetBudget: false,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 2,
   },
   PLANT_MANAGER: {
@@ -191,6 +199,7 @@ export const ROLES = {
     canViewBudgetMenu: true,
     canSetBudget: true,
     canOnlinePurchase: false,
+    canViewAuditLogs: false,
     level: 3,
   },
 };
@@ -243,6 +252,9 @@ export function resolveUserPermissions(user) {
 
     // ─── SPECIAL TASK PERMISSIONS ───
     canOnlinePurchase: isOnline || level >= 99,
+
+    // ─── ADMIN ONLY PERMISSIONS (ผู้ดูแลระบบเท่านั้น) ───
+    canViewAuditLogs: level >= 99,
   };
 }
 
