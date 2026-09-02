@@ -17,8 +17,9 @@ class GasService {
   getGasUrl() {
     const fromStorage = localStorage.getItem(STORAGE_KEY_GAS_URL);
     if (fromStorage && fromStorage.trim()) return fromStorage.trim();
-    return (import.meta.env.VITE_GAS_API_URL || '').trim();
+    return (import.meta.env.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS/exec').trim();
   }
+
 
   // Set & Save GAS Web App URL
   setGasUrl(url) {
