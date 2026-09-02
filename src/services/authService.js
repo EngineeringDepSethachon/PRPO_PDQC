@@ -1,8 +1,11 @@
 import { resolveUserPermissions, ROLES } from '../config/constants';
 import { gasService } from './gasService';
+import { auditService } from './auditService';
+import { getClientIpSync, getClientDeviceInfo } from '../utils/ipTracker';
 
 const AUTH_SESSION_KEY = 'prpo_auth_session';
 const REGISTERED_USERS_KEY = 'prpo_registered_users';
+
 
 
 // Pre-configured Employee Accounts categorized by Position for Localhost Testing
@@ -148,6 +151,8 @@ export const authService = {
   // Authenticate user with Username / Password
   async login(username, password, _optionalLegacyUid = null) {
     const cleanUser = (username || '').trim().toLowerCase();
+    const clientIp = getClientIpSync();
+    const deviceInfo = getClientDeviceInfo();
 
     // 1. Try Authenticating via Google Apps Script Web App (if configured)
     if (gasService.isConfigured()) {
@@ -169,6 +174,9 @@ export const authService = {
             level: Number(gasUser.level) || 1,
             pictureUrl: gasUser.pictureUrl || '',
             lastLogin: new Date().toISOString(),
+            lastLoginIp: clientIp,
+            deviceInfo: deviceInfo,
+            pdpaConsentAt: gasUser.pdpaConsentAt || new Date().toISOString(),
             authSource: 'GOOGLE_SHEETS'
           };
 
@@ -178,11 +186,23 @@ export const authService = {
           const localUsers = this.getRegisteredUsers();
           const existingIdx = localUsers.findIndex(u => u.username?.toLowerCase() === cleanUser);
           if (existingIdx !== -1) {
-            localUsers[existingIdx] = { ...localUsers[existingIdx], ...gasUser, password };
+            localUsers[existingIdx] = { ...localUsers[existingIdx], ...gasUser, password, lastLoginIp: clientIp, lastLoginAt: sessionData.lastLogin };
           } else {
-            localUsers.push({ ...gasUser, password });
+            localUsers.push({ ...gasUser, password, lastLoginIp: clientIp, lastLoginAt: sessionData.lastLogin });
           }
           this.saveRegisteredUsers(localUsers);
+
+          // Write to local audit trail with IP address
+          auditService.logAction({
+            action: 'USER_LOGIN',
+            actor: sessionData,
+            department: sessionData.department,
+            docNo: sessionData.employeeId || sessionData.username,
+            docType: 'SYSTEM',
+            details: `เข้าสู่ระบบสำเร็จ (${sessionData.username}) ผ่าน Google Sheets Master [IP: ${clientIp}]`,
+            ipAddress: clientIp,
+            userAgent: deviceInfo
+          });
 
           return {
             ...rolePermissions,
@@ -211,6 +231,7 @@ export const authService = {
     }
 
     matched.lastLogin = new Date().toISOString();
+    matched.lastLoginIp = clientIp;
     this.saveRegisteredUsers(users);
 
     const rolePermissions = resolveUserPermissions(matched);
@@ -228,10 +249,25 @@ export const authService = {
       level: matched.level,
       pictureUrl: matched.pictureUrl,
       lastLogin: matched.lastLogin,
+      lastLoginIp: clientIp,
+      deviceInfo: deviceInfo,
+      pdpaConsentAt: matched.pdpaConsentAt || new Date().toISOString(),
       authSource: 'LOCAL_CACHE'
     };
 
     localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
+
+    // Write to local audit trail with IP address
+    auditService.logAction({
+      action: 'USER_LOGIN',
+      actor: sessionData,
+      department: sessionData.department,
+      docNo: sessionData.employeeId || sessionData.username,
+      docType: 'SYSTEM',
+      details: `เข้าสู่ระบบสำเร็จ (${sessionData.username}) [IP: ${clientIp}]`,
+      ipAddress: clientIp,
+      userAgent: deviceInfo
+    });
 
     return {
       ...rolePermissions,
@@ -239,6 +275,38 @@ export const authService = {
       role: rolePermissions
     };
   },
+
+  // Save PDPA consent for user
+  savePdpaConsent(username, userObject = null) {
+    const consentTime = new Date().toISOString();
+    const clientIp = getClientIpSync();
+    const device = getClientDeviceInfo();
+
+    // Update active session
+    const current = this.getCurrentUser();
+    if (current) {
+      current.pdpaConsentAt = consentTime;
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(current));
+    }
+
+    // Update in registered users cache
+    const users = this.getRegisteredUsers();
+    const cleanU = (username || current?.username || '').toLowerCase();
+    const user = users.find(u => u.username?.toLowerCase() === cleanU);
+    if (user) {
+      user.pdpaConsentAt = consentTime;
+      user.lastLoginIp = clientIp;
+      this.saveRegisteredUsers(users);
+    }
+
+    // Log to Audit trail
+    auditService.logPdpaConsent(userObject || current || { name: username }, clientIp, device);
+
+    // Sync to GAS
+    gasService.savePdpaConsent(username).catch(() => {});
+    return true;
+  },
+
 
 
   // Instant login by Position for Localhost Testing

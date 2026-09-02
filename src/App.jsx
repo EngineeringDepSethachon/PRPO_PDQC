@@ -19,6 +19,8 @@ import QuickIssueView from './views/QuickIssueView';
 import BudgetView from './views/BudgetView';
 import MasterDataView from './views/MasterDataView';
 import OnlineTaskView from './views/OnlineTaskView';
+import AuditLogView from './views/AuditLogView';
+
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(authService.getCurrentSession());
@@ -281,7 +283,12 @@ export default function App() {
               onRefresh={refreshData}
             />
           )}
+
+          {activeView === 'audit-logs' && (
+            <AuditLogView currentRole={currentRole} />
+          )}
         </main>
+
       </div>
 
       {/* Global Deep-Linked PR Details Modal */}

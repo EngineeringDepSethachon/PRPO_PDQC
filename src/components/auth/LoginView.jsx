@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authService } from '../../services/authService';
+import { getClientIp } from '../../utils/ipTracker';
+import PdpaModal from '../common/PdpaModal';
 import { 
   Factory, Lock, User, Eye, EyeOff,
-  AlertCircle, ArrowRight, Lightbulb, ShieldCheck
+  AlertCircle, ArrowRight, Lightbulb, ShieldCheck,
+  Globe, Shield, CheckSquare, Square
 } from 'lucide-react';
 
 export default function LoginView({ onLoginSuccess }) {
@@ -11,10 +14,23 @@ export default function LoginView({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [clientIp, setClientIp] = useState('กำลังตรวจสอบ IP...');
+  const [pdpaConsent, setPdpaConsent] = useState(true);
+  const [showPdpaModal, setShowPdpaModal] = useState(false);
+
+  useEffect(() => {
+    getClientIp().then(ip => setClientIp(ip || '127.0.0.1 (Local)'));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (!pdpaConsent) {
+      setErrorMsg('กรุณายินยอมข้อตกลงการคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -23,6 +39,10 @@ export default function LoginView({ onLoginSuccess }) {
       }
 
       const userSession = await authService.login(username.trim(), password);
+      
+      // Save PDPA consent confirmation
+      authService.savePdpaConsent(username.trim(), userSession);
+
       if (onLoginSuccess) {
         onLoginSuccess(userSession);
       }
@@ -55,10 +75,16 @@ export default function LoginView({ onLoginSuccess }) {
             ระบบจัดซื้อและคลังสินค้า ฝ่ายผลิต (PD) & ฝ่ายควบคุมคุณภาพ (QC)
           </p>
 
-          {/* Cloud Master Data Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/70 border border-indigo-800/60 text-indigo-300 text-[11px] font-bold mt-3 shadow-inner">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Google Sheets Master List Authentication</span>
+          {/* Client IP & Cloud Master Data Badge */}
+          <div className="flex items-center justify-center gap-2 flex-wrap mt-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/70 border border-indigo-800/60 text-indigo-300 text-[11px] font-bold shadow-inner">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Google Sheets Master</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/80 text-slate-300 text-[11px] font-mono shadow-inner">
+              <Globe className="w-3 h-3 text-emerald-400" />
+              <span>IP: {clientIp}</span>
+            </div>
           </div>
         </div>
 
@@ -121,6 +147,37 @@ export default function LoginView({ onLoginSuccess }) {
             </div>
           </div>
 
+          {/* PDPA Consent & Notice Box */}
+          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <button
+                type="button"
+                onClick={() => setPdpaConsent(!pdpaConsent)}
+                className="mt-0.5 text-indigo-400 hover:text-indigo-300 shrink-0"
+              >
+                {pdpaConsent ? (
+                  <CheckSquare className="w-4 h-4 text-indigo-500" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-600" />
+                )}
+              </button>
+              <span className="text-[11px] text-slate-300 leading-snug">
+                ข้าพเจ้ายินยอมให้ระบบบันทึกข้อมูลส่วนบุคคล, ประวัติการเข้าใช้งาน, 
+                ที่อยู่ IP เครื่อง (<span className="font-mono text-indigo-400">{clientIp}</span>) 
+                และประวัติการทำรายการเพื่อการตรวจสอบตาม <b>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)</b>
+              </span>
+            </label>
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => setShowPdpaModal(true)}
+                className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer"
+              >
+                อ่านประกาศนโยบายคุ้มครองข้อมูลส่วนบุคคลฉบับเต็ม ↗
+              </button>
+            </div>
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -130,7 +187,7 @@ export default function LoginView({ onLoginSuccess }) {
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                <span>กำลังเข้าสู่ระบบ...</span>
+                <span>กำลังเข้าสู่ระบบและบันทึก Log...</span>
               </span>
             ) : (
               <>
@@ -139,21 +196,23 @@ export default function LoginView({ onLoginSuccess }) {
               </>
             )}
           </button>
-
-          {/* Helper Note */}
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 flex items-start gap-2">
-            <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <span className="leading-relaxed">
-              บัญชีผู้ใช้และรหัสผ่านถูกจัดการผ่าน Master List ใน Google Sheets สามารถติดต่อแอดมินเพื่อขอรหัสผ่านหรือเพิ่มบัญชีผู้ใช้งาน
-            </span>
-          </div>
         </form>
       </div>
 
       {/* Footer copyright */}
-      <div className="mt-6 text-center text-xs text-slate-500 relative z-10">
-        © 2026 Production & Quality Control System • PDQC Co., Ltd.
+      <div className="mt-6 text-center text-xs text-slate-500 relative z-10 flex items-center justify-center gap-2">
+        <span>© 2026 Production & Quality Control System • PDQC Co., Ltd.</span>
+        <span>•</span>
+        <button
+          onClick={() => setShowPdpaModal(true)}
+          className="text-indigo-400 hover:underline cursor-pointer"
+        >
+          นโยบาย PDPA
+        </button>
       </div>
+
+      {/* PDPA Full Policy Modal */}
+      <PdpaModal isOpen={showPdpaModal} onClose={() => setShowPdpaModal(false)} />
     </div>
   );
 }

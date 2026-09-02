@@ -4,9 +4,11 @@
  * and connection health testing.
  */
 
-const STORAGE_KEY_GAS_URL = 'prpo_gas_api_url';
-const STORAGE_KEY_LAST_SYNC = 'prpo_last_sync_time';
-const STORAGE_KEY_SYNC_STATUS = 'prpo_sync_status'; // 'OFFLINE' | 'CONNECTED' | 'SYNCING' | 'ERROR'
+import { getClientIpSync, getClientDeviceInfo } from '../utils/ipTracker.js';
+
+const STORAGE_KEY_GAS_URL = 'prpo_gas_webapp_url';
+const STORAGE_KEY_LAST_SYNC = 'prpo_gas_last_sync';
+const STORAGE_KEY_SYNC_STATUS = 'prpo_gas_sync_status'; // 'OFFLINE' | 'CONNECTED' | 'SYNCING' | 'ERROR'
 
 class GasService {
   constructor() {
@@ -120,14 +122,20 @@ class GasService {
 
     try {
       const targetUrl = this.getGasUrl();
+      const ipAddress = getClientIpSync();
+      const userAgent = getClientDeviceInfo();
+
       const bodyPayload = {
         action: 'login',
         username: (username || '').trim(),
-        password: password
+        password: password,
+        ipAddress: ipAddress,
+        userAgent: userAgent
       };
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
+
 
       const response = await fetch(targetUrl, {
         method: 'POST',
@@ -215,6 +223,8 @@ class GasService {
         action,
         payload,
         user: typeof user === 'object' ? { name: user?.name, title: user?.title, department: user?.department } : { name: user || 'User' },
+        ipAddress: getClientIpSync(),
+        userAgent: getClientDeviceInfo(),
         timestamp: new Date().toISOString()
       };
 
@@ -234,6 +244,19 @@ class GasService {
       return { status: 'offline_buffered', error: err.toString() };
     }
   }
+
+  /**
+   * Save PDPA Consent to GAS Users & AuditLogs sheet
+   */
+  async savePdpaConsent(username) {
+    if (!this.isConfigured()) return null;
+    return this.sendMutation('savePdpaConsent', {
+      username,
+      clientIp: getClientIpSync(),
+      userAgent: getClientDeviceInfo()
+    });
+  }
+
 
   /**
    * Sync All Data from Local to Google Sheets (Full Backup/Push)

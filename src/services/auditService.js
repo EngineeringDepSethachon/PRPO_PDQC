@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from '../config/constants.js';
+import { getClientIpSync, getClientDeviceInfo } from '../utils/ipTracker.js';
 
 /**
  * Audit Service for tracking all system actions, document status changes, 
@@ -15,9 +16,11 @@ export const auditService = {
    * @param {string} [params.docNo] - Document number or entity ID
    * @param {string} [params.docType] - 'PR', 'PO', 'PRODUCT', 'VENDOR', 'STOCK', 'BUDGET', 'SYSTEM'
    * @param {string} params.details - Detailed human-readable description
+   * @param {string} [params.ipAddress] - Optional IP override
+   * @param {string} [params.userAgent] - Optional device info override
    * @param {Object} [params.changes] - { before, after } or extra key-value context
    */
-  logAction({ action, actor, department, docNo, docType = 'SYSTEM', details, changes = null }) {
+  logAction({ action, actor, department, docNo, docType = 'SYSTEM', details, ipAddress = null, userAgent = null, changes = null }) {
     try {
       const now = new Date();
       const actorName = typeof actor === 'object' 
@@ -27,6 +30,8 @@ export const auditService = {
         ? (actor.title || actor.roleId || actor.id || 'N/A') 
         : 'System';
       const actorDept = department || (typeof actor === 'object' ? actor.department : 'SYSTEM') || 'GENERAL';
+      const clientIp = ipAddress || getClientIpSync();
+      const clientDevice = userAgent || getClientDeviceInfo();
 
       const logEntry = {
         id: `AUDIT-${now.getTime()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -39,6 +44,8 @@ export const auditService = {
         actorName,
         actorRole,
         details: details || '',
+        ipAddress: clientIp,
+        userAgent: clientDevice,
         changes: changes ? JSON.stringify(changes) : '',
         clientEnv: 'React Web App (GAS Compatible)',
       };
@@ -47,6 +54,7 @@ export const auditService = {
       const existing = this.getLogs();
       const updated = [logEntry, ...existing].slice(0, 1000); // Keep latest 1000 logs
       localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS || 'prpo_audit_logs', JSON.stringify(updated));
+
 
       console.log(`[AuditService] Action logged: ${action} by ${actorName} (${docNo})`);
 
@@ -100,9 +108,39 @@ export const auditService = {
   },
 
   /**
+   * Get user specific activity history and IP logs
+   */
+  getUserHistory(userIdentifier) {
+    const logs = this.getLogs();
+    if (!userIdentifier) return logs;
+    const cleanId = String(userIdentifier).toLowerCase();
+    return logs.filter(l => 
+      l.actorName?.toLowerCase().includes(cleanId) ||
+      l.details?.toLowerCase().includes(cleanId)
+    );
+  },
+
+  /**
+   * Log PDPA Consent Agreement
+   */
+  logPdpaConsent(user, ipAddress = null, userAgent = null) {
+    return this.logAction({
+      action: 'PDPA_CONSENT',
+      actor: user,
+      department: user?.department || 'ALL',
+      docNo: user?.employeeId || user?.username || '-',
+      docType: 'SYSTEM',
+      details: `ยินยอมและรับทราบนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 [IP: ${ipAddress || getClientIpSync()}]`,
+      ipAddress,
+      userAgent
+    });
+  },
+
+  /**
    * Clear all audit logs (Admin function)
    */
   clearLogs() {
+
     localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS || 'prpo_audit_logs');
     console.log('[AuditService] Audit logs cleared.');
   },

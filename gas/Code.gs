@@ -38,7 +38,7 @@ const DB_SCHEMA = {
     'department', 'monthlyBudget', 'spent', 'pending', 'variance', 'updatedAt'
   ],
   AuditLogs: [
-    'id', 'timestamp', 'action', 'actorName', 'role', 'docNo', 'department', 'details'
+    'id', 'timestamp', 'action', 'actorName', 'role', 'docNo', 'department', 'details', 'ipAddress', 'userAgent'
   ],
   Notifications: [
     'id', 'type', 'title', 'message', 'docNo', 'department', 'targetRoles', 'amount', 'actor', 'timestamp', 'timeFormatted', 'isRead'
@@ -46,9 +46,10 @@ const DB_SCHEMA = {
   Users: [
     'id', 'username', 'password', 'name', 'employeeName', 'employeeId', 
     'department', 'roleId', 'positionKey', 'title', 'level', 'status', 
-    'pictureUrl', 'updatedAt'
+    'pictureUrl', 'lastLoginIp', 'lastLoginAt', 'pdpaConsentAt', 'updatedAt'
   ]
 };
+
 
 
 // ─── 2. AUTO-CREATE SHEET & DATABASE SETUP ──────────────────────────────────
@@ -249,18 +250,24 @@ function doPost(e) {
     } else if (action === 'updateBudget') {
       responseData = apiUpdateBudget(body.department, body.amount, body.user);
     } else if (action === 'login') {
-      responseData = apiLoginUser(body.username, body.password);
+      responseData = apiLoginUser(body.username, body.password, body.ipAddress || body.clientIp, body.userAgent);
+    } else if (action === 'savePdpaConsent') {
+      responseData = apiSavePdpaConsent(body.username || body.payload?.username, body.clientIp || body.ipAddress, body.userAgent);
     } else if (action === 'getUsers') {
       responseData = { status: 'success', data: getSheetRecords(SpreadsheetApp.getActiveSpreadsheet(), 'Users') };
     } else if (action === 'saveUser') {
       responseData = apiSaveUser(body.user || body.payload, body.operator);
     } else if (action === 'logAudit') {
-      responseData = apiLogAuditAction(body.entry || body.payload);
+      const entry = body.entry || body.payload || {};
+      if (body.ipAddress && !entry.ipAddress) entry.ipAddress = body.ipAddress;
+      if (body.userAgent && !entry.userAgent) entry.userAgent = body.userAgent;
+      responseData = apiLogAuditAction(entry);
     } else if (action === 'setup') {
       responseData = setupInitialDatabase();
     } else {
       responseData = { status: 'error', message: 'Unknown action: ' + action };
     }
+
   } catch (err) {
     responseData = { status: 'error', message: err.toString() };
   }
@@ -667,13 +674,15 @@ function apiLogAuditAction(entry) {
 /**
  * ตรวจสอบการเข้าสู่ระบบผ่าน Google Sheets (Users Sheet)
  */
-function apiLoginUser(username, password) {
+function apiLoginUser(username, password, clientIp, userAgent) {
   if (!username || !password) {
     return { status: 'error', message: 'กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน' };
   }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const users = getSheetRecords(ss, 'Users');
   const cleanUser = String(username).trim().toLowerCase();
+  const ip = clientIp || '127.0.0.1';
+  const device = userAgent || 'Web Browser';
 
   const matched = users.find(u => 
     (String(u.username || '').toLowerCase() === cleanUser || String(u.employeeId || '').toLowerCase() === cleanUser) &&
@@ -688,12 +697,14 @@ function apiLoginUser(username, password) {
     return { status: 'error', message: 'บัญชีผู้ใช้งานนี้ถูกระงับการใช้งานชั่วคราว' };
   }
 
-  // Update lastLogin timestamp in sheet
+  // Update lastLogin timestamp & IP in sheet
+  matched.lastLoginAt = new Date().toISOString();
+  matched.lastLoginIp = ip;
   matched.updatedAt = new Date().toISOString();
   upsertSheetRecord(ss, 'Users', matched);
 
-  // Record audit log
-  apiLogAudit('USER_LOGIN', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `เข้าสู่ระบบสำเร็จ (${matched.username})`);
+  // Record audit log with IP address and device info
+  apiLogAudit('USER_LOGIN', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `เข้าสู่ระบบสำเร็จ (${matched.username}) [IP: ${ip}]`, ip, device);
 
   // Return user details without exposing raw password in API response
   const userSafe = { ...matched };
@@ -705,6 +716,30 @@ function apiLoginUser(username, password) {
     user: userSafe
   };
 }
+
+/**
+ * บันทึกความยินยอม PDPA (Personal Data Protection Act)
+ */
+function apiSavePdpaConsent(username, clientIp, userAgent) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const users = getSheetRecords(ss, 'Users');
+  const cleanUser = String(username || '').trim().toLowerCase();
+  const ip = clientIp || '127.0.0.1';
+  const device = userAgent || 'Web Browser';
+
+  const matched = users.find(u => String(u.username || '').toLowerCase() === cleanUser);
+  if (matched) {
+    matched.pdpaConsentAt = new Date().toISOString();
+    matched.lastLoginIp = ip;
+    matched.updatedAt = new Date().toISOString();
+    upsertSheetRecord(ss, 'Users', matched);
+
+    apiLogAudit('PDPA_CONSENT', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `ผู้ใช้ยินยอมรับทราบนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) [IP: ${ip}]`, ip, device);
+    return { status: 'success', message: 'บันทึกความยินยอม PDPA เรียบร้อยแล้ว' };
+  }
+  return { status: 'error', message: 'ไม่พบผู้ใช้งาน' };
+}
+
 
 /**
  * บันทึกหรือสร้างข้อมูลผู้ใช้งานในชีต Users
@@ -841,7 +876,7 @@ function saveBudgetsFromObject(ss, budgetsObj) {
   overwriteSheetRecords(ss, 'Budgets', records);
 }
 
-function apiLogAudit(action, actorName, role, docNo, details) {
+function apiLogAudit(action, actorName, role, docNo, details, ipAddress = '-', userAgent = '-') {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const log = {
     id: 'AUDIT-' + Date.now(),
@@ -851,7 +886,10 @@ function apiLogAudit(action, actorName, role, docNo, details) {
     role: role,
     docNo: docNo || '-',
     department: 'SYSTEM',
-    details: details || ''
+    details: details || '',
+    ipAddress: ipAddress || '-',
+    userAgent: userAgent || '-'
   };
   upsertSheetRecord(ss, 'AuditLogs', log);
 }
+

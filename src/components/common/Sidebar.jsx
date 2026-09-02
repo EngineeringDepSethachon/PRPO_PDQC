@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, ClipboardList, ShoppingBag, Warehouse, 
-  SendToBack, Wallet, Database, ShieldAlert, Factory, Sparkles, X 
+  SendToBack, Wallet, Database, ShieldAlert, Factory, Sparkles, X, ShieldCheck 
 } from 'lucide-react';
 import { workflowEngine } from '../../services/workflowEngine';
 
@@ -31,8 +31,10 @@ export default function Sidebar({
     { id: 'stock-card', label: 'คลังสินค้า (Stock)', icon: Warehouse, visible: !isOnlinePurchaser },
     { id: 'quick-issue', label: 'เบิกใช้งาน', icon: SendToBack, visible: !isOnlinePurchaser },
     { id: 'budget', label: 'งบประมาณ', icon: Wallet, visible: !isOnlinePurchaser && currentRole.canViewBudget },
-    { id: 'master-data', label: 'ข้อมูลหลัก', icon: Database, visible: !isOnlinePurchaser && currentRole.canManageMaster }
+    { id: 'master-data', label: 'ข้อมูลหลัก', icon: Database, visible: !isOnlinePurchaser && currentRole.canManageMaster },
+    { id: 'audit-logs', label: 'ประวัติ & IP Log', icon: ShieldCheck, visible: !isOnlinePurchaser && (currentRole.canManageMaster || Number(currentRole.level) >= 2) }
   ];
+
 
   const renderNavContent = (onItemClick = null) => (
     <>
