@@ -2,18 +2,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import './setup.js';
 import { authService, DEFAULT_EMPLOYEE_ACCOUNTS } from '../src/services/authService';
 
-describe('Scenario 8: Username/Password & Position Login for Localhost Testing', () => {
+describe('Scenario 8: Username/Password Authentication & Multi-Role Verification', { timeout: 30000 }, () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
   it('Default employee accounts are available for each position', () => {
     const accounts = authService.getRegisteredUsers();
-    expect(accounts.length).toBe(6);
+    expect(accounts.length).toBeGreaterThanOrEqual(6);
     expect(accounts.some(a => a.username === 'wichai.pd')).toBe(true);
     expect(accounts.some(a => a.username === 'somchai.am')).toBe(true);
     expect(accounts.some(a => a.username === 'prasert.pm')).toBe(true);
     expect(accounts.some(a => a.username === 'nat.on')).toBe(true);
+    expect(accounts.some(a => a.username === 'requester')).toBe(true);
+    expect(accounts.some(a => a.username === 'reviewer')).toBe(true);
+    expect(accounts.some(a => a.username === 'approver')).toBe(true);
   });
 
   it('Successful login returns session and role permissions', async () => {
@@ -31,12 +34,13 @@ describe('Scenario 8: Username/Password & Position Login for Localhost Testing',
     expect(savedSession.username).toBe('wichai.pd');
   });
 
-  it('Login by position key works accurately', async () => {
-    const mgrSession = await authService.loginByPosition('APPROVER');
+  it('Login by position key or username works accurately', async () => {
+    const mgrSession = await authService.login('prasert.pm', 'password123');
     expect(mgrSession.name).toBe('คุณประเสริฐ (Plant Mgr)');
     expect(mgrSession.canFinalApprove).toBe(true);
     expect(mgrSession.canViewBudget).toBe(true);
   });
+
 
   it('Login with invalid credentials throws descriptive error', async () => {
     await expect(

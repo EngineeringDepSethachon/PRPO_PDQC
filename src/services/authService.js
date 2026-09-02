@@ -110,19 +110,113 @@ export const DEFAULT_EMPLOYEE_ACCOUNTS = [
     status: 'ACTIVE',
     pictureUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
     description: 'ผู้ดูแลระบบ สิทธิ์สูงสุดในการจัดการข้อมูลทุกส่วน'
+  },
+  {
+    id: 'USR-0010',
+    employeeId: 'EMP-REQ-001',
+    username: 'requester',
+    password: 'password123',
+    name: 'คุณผู้ขอซื้อ (Requester)',
+    employeeName: 'คุณผู้ขอซื้อ ปฏิบัติการ',
+    displayName: 'Requester (ผู้ขอซื้อ)',
+    department: 'PD',
+    roleId: 'REQUESTER',
+    positionKey: 'REQUESTER',
+    title: 'Requester',
+    level: 1,
+    status: 'ACTIVE',
+    pictureUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    description: 'ผู้ขอซื้อ มีอำนาจสร้าง/ยื่นส่ง PR ทั้งแคตตาล็อกและนอกรายการ, ตรวจรับของเข้าสต็อก'
+  },
+  {
+    id: 'USR-0011',
+    employeeId: 'EMP-REV-001',
+    username: 'reviewer',
+    password: 'password123',
+    name: 'คุณผู้ตรวจทาน (Reviewer)',
+    employeeName: 'คุณผู้ตรวจทาน งานจัดซื้อ',
+    displayName: 'Reviewer (ผู้ตรวจทาน)',
+    department: 'ALL',
+    roleId: 'ASST_MANAGER',
+    positionKey: 'REVIEWER',
+    title: 'Reviewer / Asst. Manager',
+    level: 2,
+    status: 'ACTIVE',
+    pictureUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    description: 'ผู้ตรวจทาน มีอำนาจตรวจสอบ PR ทุกแผนก, เช็คงบประมาณ, อนุมัติผ่านขั้นแรก หรือส่งกลับแก้ไข'
+  },
+  {
+    id: 'USR-0012',
+    employeeId: 'EMP-APP-001',
+    username: 'approver',
+    password: 'password123',
+    name: 'คุณผู้อนุมัติ (Approver)',
+    employeeName: 'คุณผู้อนุมัติ ขั้นสุดท้าย',
+    displayName: 'Approver (ผู้อนุมัติ)',
+    department: 'ALL',
+    roleId: 'PLANT_MANAGER',
+    positionKey: 'APPROVER',
+    title: 'Approver / Plant Manager',
+    level: 3,
+    status: 'ACTIVE',
+    pictureUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
+    description: 'ผู้อนุมัติขั้นสุดท้าย มีอำนาจอนุมัติ PR ออก PO อัตโนมัติ, ตัดงบประมาณ, จัดการงบ'
+  },
+  {
+    id: 'USR-0013',
+    employeeId: 'EMP-QA-001',
+    username: 'qa.backend',
+    password: 'password123',
+    name: 'QA ตรวจระบบหลังบ้าน (Backend QA)',
+    employeeName: 'ทีมตรวจสอบระบบหลังบ้าน (QA Engineer)',
+    displayName: 'QA Backend (ตรวจหลังบ้าน)',
+    department: 'ALL',
+    roleId: 'ADMIN',
+    positionKey: 'ADMIN',
+    title: 'QA Backend Engineer',
+    level: 99,
+    status: 'ACTIVE',
+    pictureUrl: 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150&auto=format&fit=crop&q=80',
+    description: 'QA ตรวจสอบหลังบ้าน มีอำนาจตรวจสอบ API, ข้อมูลชีต, ประวัติ Audit Log, IP Tracking'
+  },
+  {
+    id: 'USR-0014',
+    employeeId: 'EMP-DEV-001',
+    username: 'dev.backend',
+    password: 'password123',
+    name: 'Dev แก้ไขหลังบ้าน (Backend Dev)',
+    employeeName: 'ทีมนักพัฒนาหลังบ้าน (Backend Developer)',
+    displayName: 'Dev Backend (พัฒนาหลังบ้าน)',
+    department: 'ALL',
+    roleId: 'ADMIN',
+    positionKey: 'ADMIN',
+    title: 'Dev Backend Engineer',
+    level: 99,
+    status: 'ACTIVE',
+    pictureUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
+    description: 'Dev พัฒนาหลังบ้าน มีอำนาจแก้ไขโค้ด, ตรวจสอบ Concurrency, ปรับปรุงระบบหลังบ้าน'
   }
 ];
 
 export const authService = {
-  // Get all registered accounts
+  // Get all registered accounts (auto-merges new default accounts)
   getRegisteredUsers() {
     try {
       const data = localStorage.getItem(REGISTERED_USERS_KEY);
-      return data ? JSON.parse(data) : DEFAULT_EMPLOYEE_ACCOUNTS;
+      if (!data) return DEFAULT_EMPLOYEE_ACCOUNTS;
+      const parsed = JSON.parse(data);
+      const merged = Array.isArray(parsed) ? [...parsed] : [];
+      DEFAULT_EMPLOYEE_ACCOUNTS.forEach(defUser => {
+        if (!merged.some(u => u.username?.toLowerCase() === defUser.username.toLowerCase())) {
+          merged.push(defUser);
+        }
+      });
+      return merged;
     } catch {
       return DEFAULT_EMPLOYEE_ACCOUNTS;
     }
   },
+
 
   saveRegisteredUsers(users) {
     localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
@@ -212,7 +306,8 @@ export const authService = {
           return {
             ...rolePermissions,
             ...sessionData,
-            role: rolePermissions
+            role: rolePermissions,
+            rolePermissions: rolePermissions
           };
         }
       } catch (err) {
@@ -277,8 +372,10 @@ export const authService = {
     return {
       ...rolePermissions,
       ...sessionData,
-      role: rolePermissions
+      role: rolePermissions,
+      rolePermissions: rolePermissions
     };
+
   },
 
   // Save PDPA consent for user

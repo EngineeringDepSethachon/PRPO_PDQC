@@ -178,11 +178,17 @@ function seedMasterData(ss) {
       ['USR-0003', 'somchai.am', 'password123', 'คุณสมชาย (Asst. Mgr)', 'คุณสมชาย มุ่งมั่น', 'EMP-MGR-001', 'ALL', 'ASST_MANAGER', 'REVIEWER', 'Assistant Manager', 2, 'ACTIVE', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', new Date()],
       ['USR-0004', 'nat.on', 'password123', 'คุณนัท (Online Purchaser)', 'คุณนัท จัดซื้อ', 'EMP-PUR-001', 'ALL', 'ONLINE_PURCHASER', 'ONLINE_PURCHASER', 'Online Purchaser', 2, 'ACTIVE', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', new Date()],
       ['USR-0005', 'prasert.pm', 'password123', 'คุณประเสริฐ (Plant Mgr)', 'คุณประเสริฐ ยิ่งยง', 'EMP-MGR-002', 'ALL', 'PLANT_MANAGER', 'APPROVER', 'Plant Manager', 3, 'ACTIVE', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', new Date()],
-      ['USR-0006', 'admin', 'admin123', 'Admin System', 'ผู้ดูแลระบบ', 'EMP-SYS-999', 'ALL', 'ADMIN', 'ADMIN', 'System Administrator', 99, 'ACTIVE', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', new Date()]
+      ['USR-0006', 'admin', 'admin123', 'Admin System', 'ผู้ดูแลระบบ', 'EMP-SYS-999', 'ALL', 'ADMIN', 'ADMIN', 'System Administrator', 99, 'ACTIVE', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0010', 'requester', 'password123', 'คุณผู้ขอซื้อ (Requester)', 'คุณผู้ขอซื้อ ปฏิบัติการ', 'EMP-REQ-001', 'PD', 'REQUESTER', 'REQUESTER', 'Requester', 1, 'ACTIVE', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0011', 'reviewer', 'password123', 'คุณผู้ตรวจทาน (Reviewer)', 'คุณผู้ตรวจทาน งานจัดซื้อ', 'EMP-REV-001', 'ALL', 'ASST_MANAGER', 'REVIEWER', 'Reviewer / Asst. Manager', 2, 'ACTIVE', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0012', 'approver', 'password123', 'คุณผู้อนุมัติ (Approver)', 'คุณผู้อนุมัติ ขั้นสุดท้าย', 'EMP-APP-001', 'ALL', 'PLANT_MANAGER', 'APPROVER', 'Approver / Plant Manager', 3, 'ACTIVE', 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0013', 'qa.backend', 'password123', 'QA ตรวจระบบหลังบ้าน (Backend QA)', 'ทีมตรวจสอบระบบหลังบ้าน (QA Engineer)', 'EMP-QA-001', 'ALL', 'ADMIN', 'ADMIN', 'QA Backend Engineer', 99, 'ACTIVE', 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0014', 'dev.backend', 'password123', 'Dev แก้ไขหลังบ้าน (Backend Dev)', 'ทีมนักพัฒนาหลังบ้าน (Backend Developer)', 'EMP-DEV-001', 'ALL', 'ADMIN', 'ADMIN', 'Dev Backend Engineer', 99, 'ACTIVE', 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80', new Date()]
     ];
     userSheet.getRange(2, 1, users.length, users[0].length).setValues(users);
   }
 }
+
 
 
 // ─── 3. WEB APP ENTRY POINT (doGet & doPost) ────────────────────────────────
@@ -287,11 +293,36 @@ function doPost(e) {
 
 // ─── 4. API FUNCTIONS ───────────────────────────────────────────────────────
 
+const DEFAULT_MASTER_USERS = [
+  { id: 'USR-0001', username: 'wichai.pd', password: 'password123', name: 'คุณวิชัย (PD)', employeeName: 'คุณวิชัย สุขใจ', employeeId: 'EMP-PD-001', department: 'PD', roleId: 'REQUESTER_PD', title: 'Requester (PD)', level: 1, status: 'ACTIVE' },
+  { id: 'USR-0002', username: 'somying.qc', password: 'password123', name: 'คุณสมหญิง (QC)', employeeName: 'คุณสมหญิง รักดี', employeeId: 'EMP-QC-001', department: 'QC', roleId: 'REQUESTER_QC', title: 'Requester (QC)', level: 1, status: 'ACTIVE' },
+  { id: 'USR-0003', username: 'somchai.am', password: 'password123', name: 'คุณสมชาย (Asst. Mgr)', employeeName: 'คุณสมชาย มุ่งมั่น', employeeId: 'EMP-MGR-001', department: 'ALL', roleId: 'ASST_MANAGER', title: 'Assistant Manager', level: 2, status: 'ACTIVE' },
+  { id: 'USR-0004', username: 'nat.on', password: 'password123', name: 'คุณนัท (Online Purchaser)', employeeName: 'คุณนัท จัดซื้อ', employeeId: 'EMP-PUR-001', department: 'ALL', roleId: 'ONLINE_PURCHASER', title: 'Online Purchaser', level: 2, status: 'ACTIVE' },
+  { id: 'USR-0005', username: 'prasert.pm', password: 'password123', name: 'คุณประเสริฐ (Plant Mgr)', employeeName: 'คุณประเสริฐ ยิ่งยง', employeeId: 'EMP-MGR-002', department: 'ALL', roleId: 'PLANT_MANAGER', title: 'Plant Manager', level: 3, status: 'ACTIVE' },
+  { id: 'USR-0006', username: 'admin', password: 'admin123', name: 'Admin System', employeeName: 'ผู้ดูแลระบบ', employeeId: 'EMP-SYS-999', department: 'ALL', roleId: 'ADMIN', title: 'System Administrator', level: 99, status: 'ACTIVE' },
+  { id: 'USR-0010', username: 'requester', password: 'password123', name: 'คุณผู้ขอซื้อ (Requester)', employeeName: 'คุณผู้ขอซื้อ ปฏิบัติการ', employeeId: 'EMP-REQ-001', department: 'PD', roleId: 'REQUESTER', title: 'Requester', level: 1, status: 'ACTIVE' },
+  { id: 'USR-0011', username: 'reviewer', password: 'password123', name: 'คุณผู้ตรวจทาน (Reviewer)', employeeName: 'คุณผู้ตรวจทาน งานจัดซื้อ', employeeId: 'EMP-REV-001', department: 'ALL', roleId: 'ASST_MANAGER', title: 'Reviewer / Asst. Manager', level: 2, status: 'ACTIVE' },
+  { id: 'USR-0012', username: 'approver', password: 'password123', name: 'คุณผู้อนุมัติ (Approver)', employeeName: 'คุณผู้อนุมัติ ขั้นสุดท้าย', employeeId: 'EMP-APP-001', department: 'ALL', roleId: 'PLANT_MANAGER', title: 'Approver / Plant Manager', level: 3, status: 'ACTIVE' },
+  { id: 'USR-0013', username: 'qa.backend', password: 'password123', name: 'QA ตรวจระบบหลังบ้าน (Backend QA)', employeeName: 'ทีมตรวจสอบระบบหลังบ้าน (QA Engineer)', employeeId: 'EMP-QA-001', department: 'ALL', roleId: 'ADMIN', title: 'QA Backend Engineer', level: 99, status: 'ACTIVE' },
+  { id: 'USR-0014', username: 'dev.backend', password: 'password123', name: 'Dev แก้ไขหลังบ้าน (Backend Dev)', employeeName: 'ทีมนักพัฒนาหลังบ้าน (Backend Developer)', employeeId: 'EMP-DEV-001', department: 'ALL', roleId: 'ADMIN', title: 'Dev Backend Engineer', level: 99, status: 'ACTIVE' }
+];
+
 /**
- * ดึงข้อมูลทั้งหมดใน 1 Round-Trip
+ * ดึงข้อมูลทั้งหมดใน 1 Round-Trip และรับประกันว่า Master Users มีครบถ้วน
  */
 function apiGetInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const users = getSheetRecords(ss, 'Users');
+
+  // Auto-sync missing default users into Users sheet
+  DEFAULT_MASTER_USERS.forEach(mu => {
+    if (!users.some(u => String(u.username || '').toLowerCase() === mu.username.toLowerCase())) {
+      const record = { ...mu, updatedAt: new Date().toISOString() };
+      upsertSheetRecord(ss, 'Users', record);
+      users.push(record);
+    }
+  });
+
   return {
     products: getSheetRecords(ss, 'Products'),
     vendors: getSheetRecords(ss, 'Vendors'),
@@ -302,9 +333,10 @@ function apiGetInitialData() {
     budgets: getBudgetsObject(ss),
     auditLogs: getSheetRecords(ss, 'AuditLogs'),
     notifications: getSheetRecords(ss, 'Notifications', ['targetRoles']),
-    users: getSheetRecords(ss, 'Users')
+    users: users
   };
 }
+
 
 
 /**
@@ -367,13 +399,20 @@ function apiSavePR(prData, user) {
     const dept = prData.department || 'PD';
     
     if (!prData.prNumber) {
-      const year = new Date().getFullYear().toString().slice(-2);
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const prefix = `PR-${dept}-${year}${month}-`;
-      const prs = getSheetRecords(ss, 'PRs');
-      const count = prs.filter(p => p.prNumber && p.prNumber.startsWith(prefix)).length + 1;
-      prData.prNumber = `${prefix}${String(count).padStart(3, '0')}`;
+      if (prData.prNo) {
+        prData.prNumber = prData.prNo;
+      } else {
+        const year = new Date().getFullYear().toString().slice(-2);
+        const month = String(new Date().getMonth() + 1).padStart(2, '0');
+        const prefix = `PR-${dept}-${year}${month}-`;
+        const prs = getSheetRecords(ss, 'PRs');
+        const count = prs.filter(p => p.prNumber && p.prNumber.startsWith(prefix)).length + 1;
+        prData.prNumber = `${prefix}${String(count).padStart(3, '0')}`;
+      }
     }
+    prData.prNo = prData.prNumber;
+    prData.totalAmount = parseFloat(prData.totalAmount) || 0;
+
     if (!prData.id) prData.id = 'PR-' + Date.now();
     prData.updatedAt = new Date().toISOString();
     if (!prData.createdAt) prData.createdAt = new Date().toISOString();
@@ -411,6 +450,7 @@ function apiApprovePRAndCreatePO(prId, user) {
     const pos = getSheetRecords(ss, 'POs');
     const count = pos.filter(p => p.poNumber && p.poNumber.startsWith(prefix)).length + 1;
     const poNumber = `${prefix}${String(count).padStart(3, '0')}`;
+    const docPrNumber = pr.prNumber || pr.prNo || pr.id;
 
     // 3. Create PO Data
     const subtotal = Number(pr.totalAmount) || 0;
@@ -419,7 +459,7 @@ function apiApprovePRAndCreatePO(prId, user) {
       id: 'PO-' + Date.now(),
       poNumber: poNumber,
       prId: pr.id,
-      prNumber: pr.prNumber,
+      prNumber: docPrNumber,
       department: pr.department,
       vendorId: '',
       vendorName: 'รอระบุผู้จำหน่าย',
@@ -438,9 +478,24 @@ function apiApprovePRAndCreatePO(prId, user) {
     };
 
     upsertSheetRecord(ss, 'POs', poData, ['items', 'claims']);
-    apiLogAudit('APPROVE_PR_CREATE_PO', user?.name || 'Approver', user?.title || 'Plant Manager', poNumber, `อนุมัติ PR ${pr.prNumber} และออก PO ${poNumber}`);
+
+    // 4. Update Department Budget (Spent & Variance)
+    try {
+      const budgets = getBudgetsObject(ss);
+      if (budgets[pr.department]) {
+        const amt = Number(pr.totalAmount) || 0;
+        budgets[pr.department].spent = (budgets[pr.department].spent || 0) + amt;
+        budgets[pr.department].variance = (budgets[pr.department].monthlyBudget || 0) - budgets[pr.department].spent;
+        saveBudgetsFromObject(ss, budgets);
+      }
+    } catch (bErr) {
+      Logger.log('Budget update error: ' + bErr);
+    }
+
+    apiLogAudit('APPROVE_PR_CREATE_PO', user?.name || 'Approver', user?.title || 'Plant Manager', poNumber, `อนุมัติ PR ${docPrNumber} และออก PO ${poNumber}`);
     
     return { status: 'success', data: { pr, po: poData } };
+
   } finally {
     lock.releaseLock();
   }
@@ -693,14 +748,27 @@ function apiLoginUser(username, password, clientIp, userAgent) {
   const ip = clientIp || '127.0.0.1';
   const device = userAgent || 'Web Browser';
 
-  const matched = users.find(u => 
+  let matched = users.find(u => 
     (String(u.username || '').toLowerCase() === cleanUser || String(u.employeeId || '').toLowerCase() === cleanUser) &&
     String(u.password) === String(password)
   );
 
+  // Fallback to default master users if not yet written to Users sheet
+  if (!matched) {
+    const defaultMatch = DEFAULT_MASTER_USERS.find(du =>
+      (String(du.username || '').toLowerCase() === cleanUser || String(du.employeeId || '').toLowerCase() === cleanUser) &&
+      String(du.password) === String(password)
+    );
+    if (defaultMatch) {
+      matched = { ...defaultMatch, createdAt: new Date().toISOString() };
+      upsertSheetRecord(ss, 'Users', matched);
+    }
+  }
+
   if (!matched) {
     return { status: 'error', message: 'ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง' };
   }
+
 
   if (matched.status && matched.status !== 'ACTIVE') {
     return { status: 'error', message: 'บัญชีผู้ใช้งานนี้ถูกระงับการใช้งานชั่วคราว' };
