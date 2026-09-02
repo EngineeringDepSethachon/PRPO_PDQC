@@ -42,8 +42,14 @@ const DB_SCHEMA = {
   ],
   Notifications: [
     'id', 'type', 'title', 'message', 'docNo', 'department', 'targetRoles', 'amount', 'actor', 'timestamp', 'timeFormatted', 'isRead'
+  ],
+  Users: [
+    'id', 'username', 'password', 'name', 'employeeName', 'employeeId', 
+    'department', 'roleId', 'positionKey', 'title', 'level', 'status', 
+    'pictureUrl', 'updatedAt'
   ]
 };
+
 
 // ─── 2. AUTO-CREATE SHEET & DATABASE SETUP ──────────────────────────────────
 /**
@@ -152,7 +158,22 @@ function seedMasterData(ss) {
     ];
     budgetSheet.getRange(2, 1, budgets.length, budgets[0].length).setValues(budgets);
   }
+
+  // 5. Users (Master User Accounts & Login Credentials)
+  const userSheet = ss.getSheetByName('Users');
+  if (userSheet && userSheet.getLastRow() === 1) {
+    const users = [
+      ['USR-0001', 'wichai.pd', 'password123', 'คุณวิชัย (PD)', 'คุณวิชัย สุขใจ', 'EMP-PD-001', 'PD', 'REQUESTER_PD', 'REQUESTER_PD', 'Requester (PD)', 1, 'ACTIVE', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0002', 'somying.qc', 'password123', 'คุณสมหญิง (QC)', 'คุณสมหญิง รักดี', 'EMP-QC-001', 'QC', 'REQUESTER_QC', 'REQUESTER_QC', 'Requester (QC)', 1, 'ACTIVE', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0003', 'somchai.am', 'password123', 'คุณสมชาย (Asst. Mgr)', 'คุณสมชาย มุ่งมั่น', 'EMP-MGR-001', 'ALL', 'ASST_MANAGER', 'REVIEWER', 'Assistant Manager', 2, 'ACTIVE', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0004', 'nat.on', 'password123', 'คุณนัท (Online Purchaser)', 'คุณนัท จัดซื้อ', 'EMP-PUR-001', 'ALL', 'ONLINE_PURCHASER', 'ONLINE_PURCHASER', 'Online Purchaser', 2, 'ACTIVE', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0005', 'prasert.pm', 'password123', 'คุณประเสริฐ (Plant Mgr)', 'คุณประเสริฐ ยิ่งยง', 'EMP-MGR-002', 'ALL', 'PLANT_MANAGER', 'APPROVER', 'Plant Manager', 3, 'ACTIVE', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', new Date()],
+      ['USR-0006', 'admin', 'admin123', 'Admin System', 'ผู้ดูแลระบบ', 'EMP-SYS-999', 'ALL', 'ADMIN', 'ADMIN', 'System Administrator', 99, 'ACTIVE', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', new Date()]
+    ];
+    userSheet.getRange(2, 1, users.length, users[0].length).setValues(users);
+  }
 }
+
 
 // ─── 3. WEB APP ENTRY POINT (doGet & doPost) ────────────────────────────────
 function doGet(e) {
@@ -227,6 +248,12 @@ function doPost(e) {
       responseData = apiDeleteStorageLocation(body.locationId, body.options, body.user);
     } else if (action === 'updateBudget') {
       responseData = apiUpdateBudget(body.department, body.amount, body.user);
+    } else if (action === 'login') {
+      responseData = apiLoginUser(body.username, body.password);
+    } else if (action === 'getUsers') {
+      responseData = { status: 'success', data: getSheetRecords(SpreadsheetApp.getActiveSpreadsheet(), 'Users') };
+    } else if (action === 'saveUser') {
+      responseData = apiSaveUser(body.user || body.payload, body.operator);
     } else if (action === 'logAudit') {
       responseData = apiLogAuditAction(body.entry || body.payload);
     } else if (action === 'setup') {
@@ -258,9 +285,11 @@ function apiGetInitialData() {
     stockLogs: getSheetRecords(ss, 'StockLogs'),
     budgets: getBudgetsObject(ss),
     auditLogs: getSheetRecords(ss, 'AuditLogs'),
-    notifications: getSheetRecords(ss, 'Notifications', ['targetRoles'])
+    notifications: getSheetRecords(ss, 'Notifications', ['targetRoles']),
+    users: getSheetRecords(ss, 'Users')
   };
 }
+
 
 /**
  * ซิงค์ข้อมูลทั้งหมดจาก Frontend ขึ้นสู่ Google Sheets (Full Sync / Backup)
@@ -298,10 +327,14 @@ function apiSyncAllData(payload, user) {
     if (payload.notifications && Array.isArray(payload.notifications)) {
       overwriteSheetRecords(ss, 'Notifications', payload.notifications, ['targetRoles']);
     }
+    if (payload.users && Array.isArray(payload.users)) {
+      overwriteSheetRecords(ss, 'Users', payload.users);
+    }
 
     apiLogAudit('SYNC_ALL_DATA', user?.name || 'System User', user?.title || 'Admin', '-', 'ซิงค์และสำรองข้อมูลทั้งหมดเข้า Google Sheets');
 
     return { status: 'success', message: 'ซิงค์ข้อมูลทั้งหมดขึ้น Google Sheets สำเร็จ', timestamp: new Date().toISOString() };
+
   } finally {
     lock.releaseLock();
   }
@@ -630,6 +663,70 @@ function apiLogAuditAction(entry) {
   upsertSheetRecord(ss, 'AuditLogs', entry);
   return { status: 'success' };
 }
+
+/**
+ * ตรวจสอบการเข้าสู่ระบบผ่าน Google Sheets (Users Sheet)
+ */
+function apiLoginUser(username, password) {
+  if (!username || !password) {
+    return { status: 'error', message: 'กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน' };
+  }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const users = getSheetRecords(ss, 'Users');
+  const cleanUser = String(username).trim().toLowerCase();
+
+  const matched = users.find(u => 
+    (String(u.username || '').toLowerCase() === cleanUser || String(u.employeeId || '').toLowerCase() === cleanUser) &&
+    String(u.password) === String(password)
+  );
+
+  if (!matched) {
+    return { status: 'error', message: 'ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง' };
+  }
+
+  if (matched.status && matched.status !== 'ACTIVE') {
+    return { status: 'error', message: 'บัญชีผู้ใช้งานนี้ถูกระงับการใช้งานชั่วคราว' };
+  }
+
+  // Update lastLogin timestamp in sheet
+  matched.updatedAt = new Date().toISOString();
+  upsertSheetRecord(ss, 'Users', matched);
+
+  // Record audit log
+  apiLogAudit('USER_LOGIN', matched.name || matched.username, matched.title || matched.roleId, matched.employeeId || '-', `เข้าสู่ระบบสำเร็จ (${matched.username})`);
+
+  // Return user details without exposing raw password in API response
+  const userSafe = { ...matched };
+  delete userSafe.password;
+
+  return {
+    status: 'success',
+    message: 'เข้าสู่ระบบสำเร็จ',
+    user: userSafe
+  };
+}
+
+/**
+ * บันทึกหรือสร้างข้อมูลผู้ใช้งานในชีต Users
+ */
+function apiSaveUser(userData, operator) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!userData.id) {
+      userData.id = 'USR-' + Date.now();
+    }
+    userData.updatedAt = new Date().toISOString();
+    upsertSheetRecord(ss, 'Users', userData);
+
+    apiLogAudit('SAVE_USER', operator?.name || 'Admin', operator?.title || 'System', userData.username, `บันทึกข้อมูลผู้ใช้งาน: ${userData.name} (${userData.username})`);
+    return { status: 'success', data: userData };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 
 // ─── 5. HELPER UTILITIES FOR SHEET READ / WRITE ─────────────────────────────
 function getSheetRecords(ss, sheetName, jsonFields = []) {

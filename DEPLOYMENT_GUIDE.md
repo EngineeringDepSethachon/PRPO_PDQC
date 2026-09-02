@@ -29,6 +29,7 @@
 │                DATABASE (Google Spreadsheet)                │
 │  - แท็บ Products, Vendors, StorageLocations, PRs, POs       │
 │  - แท็บ StockLogs, Budgets, AuditLogs, Notifications        │
+│  - แท็บ Users (Master List สำหรับ Username/Password & สิทธิ์) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,17 +63,18 @@
      - คลิก **ไปที่ PDQC-PRPO-Backend (ไม่ปลอดภัย) / Go to ... (unsafe)**
      - คลิก **อนุญาต (Allow)**
 4. รอจนกระทั่งแถบ Execution Log ขึ้นคำว่า `Execution completed`
-5. กลับไปดูที่ Google Sheet จะเห็นว่าระบบสร้างแท็บชีตทั้ง 9 แท็บ พร้อมหัวตารางและ Master Data ตั้งต้นให้อัตโนมัติ 100%!
+5. กลับไปดูที่ Google Sheet จะเห็นว่าระบบสร้างแท็บชีตทั้ง 10 แท็บ (`Products`, `Vendors`, `StorageLocations`, `PRs`, `POs`, `StockLogs`, `Budgets`, `AuditLogs`, `Notifications`, และ `Users`) พร้อมหัวตารางและ Master Data ตั้งต้นให้อัตโนมัติ 100%!
 
 ### ขั้นตอนที่ 1.5: Deploy เป็น Web App
 1. ที่มุมขวาบนของ Apps Script กดปุ่ม **การทำให้ใช้งานได้ (Deploy)** > **การทำให้ใช้งานได้ใหม่ (New deployment)**
 2. คลิกไอคอนรูปเฟือง ⚙️ ข้าง "เลือกประเภท" แล้วเลือก **เว็บแอป (Web app)**
 3. ตั้งค่าดังนี้:
-   - **คำอธิบาย (Description):** `Production v1`
+   - **คำอธิบาย (Description):** `Production v2 (with Login & Users Master)`
    - **เรียกใช้ในฐานะ (Execute as):** **ฉัน (Me / your-email@gmail.com)**
    - **ผู้มีสิทธิ์เข้าถึง (Who has access):** **ทุกคน (Anyone)** *(สำคัญมาก! ต้องเลือก Anyone เพื่อให้ Frontend จาก GitHub Pages สามารถเรียก API ได้)*
 4. กดปุ่ม **ทำให้ใช้งานได้ (Deploy)**
 5. **คัดลอก Web App URL** ที่ได้ (URL จะมีรูปแบบ `https://script.google.com/macros/s/AKfycb.../exec`) เพื่อนำไปใช้ในส่วนถัดไป
+
 
 ---
 
@@ -145,3 +147,11 @@ git push -u origin main
 - **Plant Manager:** อนุมัติ PR & ออก PO อัตโนมัติ (Level 2 Final Approve)
 - **Online Purchaser:** จัดการสั่งซื้อและติดตามสินค้าออนไลน์
 - **Admin / Warehouse Manager:** จัดการ Master Data สินค้า, ผู้ขาย, จุดจัดเก็บ และงบประมาณ
+
+### 👥 การจัดการบัญชีผู้ใช้งานผ่าน Google Sheets (Users Sheet):
+ระบบจัดเก็บข้อมูลผู้ใช้และรหัสผ่านไว้ในแท็บชีต **`Users`**:
+- **การเพิ่มพนักงานใหม่:** เปิดชีต `Users` พิมพ์ข้อมูลพนักงานในแถวใหม่ (ระบุ `username`, `password`, `department`, `roleId` เช่น `REQUESTER_PD`, `PLANT_MANAGER`, `ADMIN`)
+- **การเปลี่ยนรหัสผ่าน:** แก้ไขรหัสผ่านในคอลัมน์ `password` ได้โดยตรง
+- **การระงับการใช้งาน:** เปลี่ยนคอลัมน์ `status` จาก `ACTIVE` เป็น `INACTIVE`
+- เมื่อผู้ใช้เข้าสู่ระบบผ่านหน้าเว็บ ระบบจะตรวจสอบกับข้อมูลล่าสุดในชีต `Users` แบบ Real-time ทันที
+

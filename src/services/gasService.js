@@ -110,9 +110,67 @@ class GasService {
   }
 
   /**
+   * Authenticate user with Google Sheets (Users Sheet)
+   */
+  async login(username, password) {
+    if (!this.isConfigured()) {
+      throw new Error('ยังไม่ได้กำหนด URL ของ Google Apps Script');
+    }
+
+    try {
+      const targetUrl = this.getGasUrl();
+      const bodyPayload = {
+        action: 'login',
+        username: (username || '').trim(),
+        password: password
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(bodyPayload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      const result = await response.json();
+      if (result.status === 'success' && result.user) {
+        return result.user;
+      } else {
+        throw new Error(result.message || 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง');
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('การเชื่อมต่อกับ Google Sheets หมดเวลา (Timeout)');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Get all users from Users sheet
+   */
+  async getUsers() {
+    if (!this.isConfigured()) return null;
+    const res = await this.sendMutation('getUsers', {});
+    return res?.data || null;
+  }
+
+  /**
+   * Save user to Users sheet
+   */
+  async saveUser(user, operator = null) {
+    return this.sendMutation('saveUser', { user }, operator);
+  }
+
+  /**
    * Pull Initial Data from Google Sheets Database
    */
   async pullInitialData() {
+
     if (!this.isConfigured()) return null;
 
     try {

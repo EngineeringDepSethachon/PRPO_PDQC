@@ -481,7 +481,8 @@ export const storageService = {
       stockLogs: this.getStockLogs(),
       budgets: this.getBudgets(),
       auditLogs: JSON.parse(localStorage.getItem('prpo_audit_logs') || '[]'),
-      notifications: JSON.parse(localStorage.getItem('prpo_notifications') || '[]')
+      notifications: JSON.parse(localStorage.getItem('prpo_notifications') || '[]'),
+      users: JSON.parse(localStorage.getItem('prpo_registered_users') || '[]')
     };
   },
 
@@ -514,7 +515,11 @@ export const storageService = {
     if (data.notifications && Array.isArray(data.notifications)) {
       localStorage.setItem('prpo_notifications', JSON.stringify(data.notifications));
     }
+    if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+      localStorage.setItem('prpo_registered_users', JSON.stringify(data.users));
+    }
     return true;
   }
 };
+
 

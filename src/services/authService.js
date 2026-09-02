@@ -1,7 +1,9 @@
 import { resolveUserPermissions, ROLES } from '../config/constants';
+import { gasService } from './gasService';
 
 const AUTH_SESSION_KEY = 'prpo_auth_session';
 const REGISTERED_USERS_KEY = 'prpo_registered_users';
+
 
 // Pre-configured Employee Accounts categorized by Position for Localhost Testing
 export const DEFAULT_EMPLOYEE_ACCOUNTS = [
@@ -145,11 +147,62 @@ export const authService = {
 
   // Authenticate user with Username / Password
   async login(username, password, _optionalLegacyUid = null) {
-    const users = this.getRegisteredUsers();
     const cleanUser = (username || '').trim().toLowerCase();
-    
+
+    // 1. Try Authenticating via Google Apps Script Web App (if configured)
+    if (gasService.isConfigured()) {
+      try {
+        const gasUser = await gasService.login(cleanUser, password);
+        if (gasUser) {
+          const rolePermissions = resolveUserPermissions(gasUser);
+          const sessionData = {
+            id: gasUser.id,
+            username: gasUser.username,
+            employeeId: gasUser.employeeId,
+            name: gasUser.name || gasUser.employeeName,
+            employeeName: gasUser.employeeName || gasUser.name,
+            displayName: gasUser.displayName || gasUser.name,
+            department: gasUser.department || 'ALL',
+            roleId: gasUser.roleId,
+            positionKey: gasUser.positionKey || gasUser.roleId,
+            title: gasUser.title,
+            level: Number(gasUser.level) || 1,
+            pictureUrl: gasUser.pictureUrl || '',
+            lastLogin: new Date().toISOString(),
+            authSource: 'GOOGLE_SHEETS'
+          };
+
+          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
+
+          // Also update local registered users cache
+          const localUsers = this.getRegisteredUsers();
+          const existingIdx = localUsers.findIndex(u => u.username?.toLowerCase() === cleanUser);
+          if (existingIdx !== -1) {
+            localUsers[existingIdx] = { ...localUsers[existingIdx], ...gasUser, password };
+          } else {
+            localUsers.push({ ...gasUser, password });
+          }
+          this.saveRegisteredUsers(localUsers);
+
+          return {
+            ...rolePermissions,
+            ...sessionData,
+            role: rolePermissions
+          };
+        }
+      } catch (err) {
+        // If authentication error returned from GAS (wrong password, account inactive), throw directly
+        if (err.message && (err.message.includes('รหัสผ่าน') || err.message.includes('ชื่อผู้ใช้งาน') || err.message.includes('ระงับ'))) {
+          throw err;
+        }
+        console.warn('[AuthService] GAS login failed or timed out, falling back to local cache:', err);
+      }
+    }
+
+    // 2. Fallback to Local Master Data cache
+    const users = this.getRegisteredUsers();
     const matched = users.find(u => 
-      (u.username.toLowerCase() === cleanUser || u.employeeId?.toLowerCase() === cleanUser) && 
+      (u.username?.toLowerCase() === cleanUser || u.employeeId?.toLowerCase() === cleanUser) && 
       u.password === password
     );
 
@@ -174,7 +227,8 @@ export const authService = {
       title: matched.title,
       level: matched.level,
       pictureUrl: matched.pictureUrl,
-      lastLogin: matched.lastLogin
+      lastLogin: matched.lastLogin,
+      authSource: 'LOCAL_CACHE'
     };
 
     localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
@@ -185,6 +239,7 @@ export const authService = {
       role: rolePermissions
     };
   },
+
 
   // Instant login by Position for Localhost Testing
   async loginByPosition(positionOrUsername) {

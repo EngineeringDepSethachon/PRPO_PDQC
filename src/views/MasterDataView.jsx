@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Database, Plus, Edit3, Trash2, ShieldAlert, Building2, Search, X, Package, Store, PenTool, MapPin, Layers, Boxes } from 'lucide-react';
+import { Database, Plus, Edit3, Trash2, ShieldAlert, Building2, Search, X, Package, Store, PenTool, MapPin, Layers, Boxes, Users as UsersIcon, Key, Eye, EyeOff, ShieldCheck, UserCheck } from 'lucide-react';
 import ProductCRUDModal from '../components/admin/ProductCRUDModal';
 import VendorCRUDModal from '../components/admin/VendorCRUDModal';
 import StorageLocationCRUDModal from '../components/admin/StorageLocationCRUDModal';
@@ -7,7 +7,9 @@ import DeleteLocationModal from '../components/admin/DeleteLocationModal';
 import SignatureManagerSection from '../components/admin/SignatureManagerSection';
 import { storageService } from '../services/storageService';
 import { apiService } from '../services/apiService';
+import { authService } from '../services/authService';
 import { modalService } from '../services/modalService';
+
 
 export default function MasterDataView({ products = [], vendors = [], currentRole, onRefresh }) {
   const [activeTab, setActiveTab] = useState('products');
@@ -88,7 +90,34 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
     });
   }, [locsList, canSeeAll, myDept, locDeptFilter, locSearch]);
 
+  // Users State & Filter
+  const [usersList, setUsersList] = useState(() => authService.getRegisteredUsers());
+  const [userSearch, setUserSearch] = useState('');
+  const [userDeptFilter, setUserDeptFilter] = useState('ALL');
+  const [visiblePasswords, setVisiblePasswords] = useState({});
+
+  useEffect(() => {
+    setUsersList(authService.getRegisteredUsers());
+  }, [products]);
+
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(u => {
+      const matchesDept = userDeptFilter === 'ALL' || u.department === userDeptFilter || u.department === 'ALL';
+      const q = userSearch.trim().toLowerCase();
+      const matchesSearch = !q || (
+        u.name?.toLowerCase().includes(q) ||
+        u.employeeName?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q) ||
+        u.employeeId?.toLowerCase().includes(q) ||
+        u.title?.toLowerCase().includes(q) ||
+        u.roleId?.toLowerCase().includes(q)
+      );
+      return matchesDept && matchesSearch;
+    });
+  }, [usersList, userDeptFilter, userSearch]);
+
   // Access check
+
   if (!currentRole?.canManageMaster) {
     return (
       <div className="w-full my-12 text-center p-8 bg-white rounded-3xl border border-slate-200/80 shadow-sm space-y-4 animate-fade-in">
@@ -287,7 +316,21 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
             <span>จัดการลายเซ็นอิเล็กทรอนิกส์</span>
           </button>
         )}
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'users'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <UsersIcon className="w-4 h-4 text-blue-600" />
+            <span>บัญชีผู้ใช้ & รหัสผ่าน ({filteredUsers.length})</span>
+          </button>
+        )}
       </div>
+
 
       {/* Tab 1: Products */}
       {activeTab === 'products' && (
@@ -594,6 +637,167 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
       {activeTab === 'signatures' && isAdmin && (
         <SignatureManagerSection currentRole={currentRole} onRefresh={onRefresh} />
       )}
+
+      {/* Tab 5: Users Master List */}
+      {activeTab === 'users' && isAdmin && (
+        <div className="space-y-4">
+          {/* Info Banner */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex items-start gap-3 shadow-2xs">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+              <Key className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-xs">
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <span>จัดการบัญชีผู้ใช้งานและรหัสผ่าน (User Accounts Master)</span>
+                <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                  ชีต Users ใน Google Sheets
+                </span>
+              </h4>
+              <p className="text-slate-600 leading-relaxed">
+                ข้อมูลผู้ใช้ทั้งหมดนี้จะถูกจัดเก็บในชีต <b>Users</b> บน Google Sheets แอดมินสามารถเปิด Google Sheet เข้าไปเพิ่มพนักงาน, เปลี่ยนรหัสผ่าน, หรือปรับสิทธิ์การทำงานได้โดยตรง หรือดูข้อมูลบัญชีผู้ใช้งานด้านล่างนี้
+              </p>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl shrink-0">
+              {['ALL', 'PD', 'QC'].map(dept => (
+                <button
+                  key={dept}
+                  onClick={() => setUserDeptFilter(dept)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    userDeptFilter === dept
+                      ? 'bg-white text-slate-900 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {dept === 'ALL' ? 'ทุกแผนก' : `ฝ่าย ${dept}`}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                placeholder="ค้นหาชื่อ, Username, รหัสพนักงาน..."
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              />
+              {userSearch && (
+                <button
+                  onClick={() => setUserSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Users Table */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-4">พนักงาน</th>
+                    <th className="py-3 px-4">Username / รหัสพนักงาน</th>
+                    <th className="py-3 px-4 text-center">แผนก</th>
+                    <th className="py-3 px-4">ตำแหน่ง / สิทธิ์</th>
+                    <th className="py-3 px-4">รหัสผ่าน (Password)</th>
+                    <th className="py-3 px-4 text-center">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        ไม่พบบัญชีผู้ใช้งานที่ตรงกับเงื่อนไขการค้นหา
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((user) => {
+                      const isPwdVisible = visiblePasswords[user.id];
+                      return (
+                        <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              {user.pictureUrl ? (
+                                <img
+                                  src={user.pictureUrl}
+                                  alt=""
+                                  className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-2xs"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold border border-indigo-100">
+                                  {user.name?.charAt(0) || 'U'}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-slate-900 text-sm">
+                                  {user.name || user.employeeName}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {user.title || 'พนักงาน'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-mono font-bold text-indigo-700 bg-indigo-50/70 px-2 py-0.5 rounded border border-indigo-100 w-fit text-xs">
+                              {user.username}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              ID: {user.employeeId || user.id}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {deptBadge(user.department)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
+                              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>{user.title || user.roleId}</span>
+                            </span>
+                            <div className="text-[10px] text-slate-400">
+                              Level {user.level || 1}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs bg-slate-100 px-2.5 py-1 rounded border border-slate-200/80 text-slate-800 font-semibold min-w-[90px] text-center">
+                                {isPwdVisible ? (user.password || 'password123') : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setVisiblePasswords(prev => ({ ...prev, [user.id]: !prev[user.id] }))}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                title={isPwdVisible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                              >
+                                {isPwdVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span>ACTIVE</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Modals */}
       {showProdModal && (
