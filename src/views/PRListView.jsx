@@ -20,13 +20,11 @@ export default function PRListView({ prs = [], currentRole, onRefresh, onNavigat
   const [deptFilter, setDeptFilter] = useState(currentRole.canViewAllDepts ? 'ALL' : currentRole.department);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Department-based access check
+  // Department-based access check (allows switching departments via filter)
   const accessiblePRs = useMemo(() => {
-    return (prs || []).filter(pr => {
-      if (currentRole.canViewAllDepts || currentRole.id === 'ADMIN') return true;
-      return pr.department === currentRole.department;
-    });
-  }, [prs, currentRole]);
+    return prs || [];
+  }, [prs]);
+
 
   // Combined Search & Filter Logic
   const filteredPRs = useMemo(() => {
@@ -195,22 +193,21 @@ export default function PRListView({ prs = [], currentRole, onRefresh, onNavigat
 
         {/* Right Controls: Dept Filter & Search Input */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {currentRole.canViewAllDepts && (
-            <div className="relative min-w-[140px]">
-              <select
-                value={deptFilter}
-                onChange={e => setDeptFilter(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 shadow-2xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
-              >
-                <option value="ALL">ทุกแผนก</option>
-                <option value="PD">ฝ่ายผลิต (PD)</option>
-                <option value="QC">ควบคุมคุณภาพ (QC)</option>
-                <option value="HR">HR & Admin (HR)</option>
-                <option value="ACCT">ฝ่ายบัญชี (ACCT)</option>
-                <option value="LAB">Micro Lab (LAB)</option>
-              </select>
-            </div>
-          )}
+          <div className="relative min-w-[140px]">
+            <select
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 shadow-2xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+            >
+              <option value="ALL">ทุกแผนก (ALL)</option>
+              <option value="PD">ฝ่ายผลิต (PD)</option>
+              <option value="QC">ควบคุมคุณภาพ (QC)</option>
+              <option value="HR">HR & Admin (HR)</option>
+              <option value="ACCT">ฝ่ายบัญชี (ACCT)</option>
+              <option value="LAB">Micro Lab (LAB)</option>
+            </select>
+          </div>
+
 
           <div className="relative flex-1 sm:w-64 min-w-[200px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />

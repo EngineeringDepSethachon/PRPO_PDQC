@@ -58,12 +58,17 @@ export default function PRCreateView({
     return lastReject?.note || null;
   }, [editingPR]);
 
-  // Filter products by the active department
+  // Filter products by the active department (robust case-insensitive matching)
   const availableProducts = useMemo(() => {
+    const cleanDept = (department || '').trim().toUpperCase();
     return products
-      .filter(p => (p.category || p.department) === department)
+      .filter(p => {
+        const pCat = (p.category || p.department || (p.code?.startsWith('QC-') ? 'QC' : 'PD')).trim().toUpperCase();
+        return pCat === cleanDept;
+      })
       .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
   }, [products, department]);
+
 
   // Transform available products into searchable options
   const productOptions = useMemo(() => {
@@ -239,10 +244,50 @@ export default function PRCreateView({
     ]);
   };
 
+  const handleAddCustomItemRow = () => {
+    const tempId = `TEMP-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    setPrItems(prev => [
+      ...prev,
+      {
+        productId: tempId,
+        isCustom: true,
+        customCode: tempId,
+        customName: '',
+        customUnit: 'ชิ้น',
+        qty: 1,
+        price: 0,
+        discountPercent: 0,
+        discountAmount: 0,
+        source: 'FACTORY'
+      }
+    ]);
+  };
+
+  const handleSetCustomItem = (index, customName = '') => {
+    const tempId = `TEMP-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const updated = [...prItems];
+    const current = updated[index] || {};
+    updated[index] = {
+      ...current,
+      isCustom: true,
+      customCode: tempId,
+      customName: customName || '',
+      customUnit: 'ชิ้น',
+      productId: tempId,
+      price: parseFloat(current.price) || 0,
+      qty: parseFloat(current.qty) || 1,
+      discountPercent: 0,
+      discountAmount: 0,
+      source: current.source || 'FACTORY'
+    };
+    setPrItems(updated);
+  };
+
   const handleRemoveItemRow = (index) => {
     if (prItems.length <= 1) return;
     setPrItems(prItems.filter((_, i) => i !== index));
   };
+
 
   const handleToggleCustomItem = (index) => {
     const updated = [...prItems];
@@ -762,11 +807,14 @@ export default function PRCreateView({
                               options={productOptions}
                               value={item.productId}
                               onChange={val => handleItemChange(idx, 'productId', val)}
+                              onAddOption={typedText => handleSetCustomItem(idx, typedText)}
+                              addOptionLabel="+ ระบุเป็นสินค้านอกแคตตาล็อก (Non-Catalog)"
                               placeholder="-- ค้นหาหรือเลือกสินค้า --"
                               searchPlaceholder={`ค้นหารหัส ชื่อสินค้า ในแผนก ${department}...`}
-                              emptyMessage={`ไม่พบสินค้าของแผนก ${department}`}
+                              emptyMessage={`ไม่พบสินค้าของแผนก ${department} ในแคตตาล็อก`}
                               required
                             />
+
                           )}
                         </div>
 
@@ -1073,15 +1121,27 @@ export default function PRCreateView({
 
               {/* Table Footer: Add Row & Items Subtotal Summary Bar */}
               <div className="p-4 sm:p-6 bg-slate-50/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-t border-slate-200/80">
-                {/* Left: Outline Add Row Button */}
-                <button
-                  type="button"
-                  onClick={handleAddItemRow}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-500 active:scale-[0.99] font-semibold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ เพิ่มรายการสินค้า (+ Add Item)</span>
-                </button>
+                {/* Left: Outline Add Row Buttons */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleAddItemRow}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-500 active:scale-[0.99] font-semibold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ เพิ่มรายการจากแคตตาล็อก</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAddCustomItemRow}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-50 border border-dashed border-purple-300 text-purple-700 hover:bg-purple-100 hover:border-purple-500 active:scale-[0.99] font-semibold text-xs sm:text-sm rounded-xl shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ ระบุสินค้านอกรายการ (Non-Catalog)</span>
+                  </button>
+                </div>
+
 
                 {/* Right: Items Subtotal */}
                 <div className="flex flex-col items-end text-right">

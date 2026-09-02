@@ -373,8 +373,40 @@ export default function SearchableSelect({
                 );
               })
             ) : (
-              <div className="p-4 text-center text-xs text-slate-400 font-medium">
-                {emptyMessage}
+              <div className="p-4 text-center space-y-2.5">
+                <p className="text-xs text-slate-500 font-medium">{emptyMessage}</p>
+                {onAddOption && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      onAddOption(searchTerm);
+                    }}
+                    className="w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{addOptionLabel || `+ ระบุ "${searchTerm || 'สินค้านี้'}" เป็นสินค้านอกรายการ (Non-Catalog)`}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* If options are found and onAddOption is available, also provide a handy footer button */}
+            {onAddOption && filteredOptions.length > 0 && (
+              <div className="p-2 border-t border-slate-100 bg-slate-50/50">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    onAddOption(searchTerm);
+                  }}
+                  className="w-full px-2.5 py-1.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/60 font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>สินค้าที่ต้องการไม่มีในรายการ? (คลิกเพื่อระบุสินค้านอกแคตตาล็อก)</span>
+                </button>
               </div>
             )}
           </div>
@@ -384,6 +416,7 @@ export default function SearchableSelect({
             <span>แสดง {filteredOptions.length} รายการ</span>
             <span>ลูกศร ↑ ↓ เพื่อเลือก</span>
           </div>
+
         </div>,
         document.body
       )}
