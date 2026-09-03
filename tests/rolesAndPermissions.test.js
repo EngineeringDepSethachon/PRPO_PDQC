@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import './setup.js';
-import { ROLES, PR_STATUS } from '../src/config/constants';
+import { ROLES, PR_STATUS, resolveUserPermissions } from '../src/config/constants';
 import { workflowEngine } from '../src/services/workflowEngine';
 
 describe('Scenario 1: Roles & Permission Matrix', () => {
@@ -138,5 +138,26 @@ describe('Scenario 1: Roles & Permission Matrix', () => {
     // Only ADMIN has canViewAuditLogs = true
     expect(ROLES.ADMIN.canViewAuditLogs).toBe(true);
   });
+
+  it('Level 2 Differentiation: Reviewer vs Online Purchaser when level is 2', () => {
+    const reviewerUser = { level: 2, roleId: 'REVIEWER', department: 'ALL', name: 'คุณผู้ตรวจทาน' };
+    const onlineUser = { level: 2, roleId: 'ONLINE_PURCHASER', department: 'ALL', name: 'คุณนัท' };
+
+    const reviewerPerms = resolveUserPermissions(reviewerUser);
+    const onlinePerms = resolveUserPermissions(onlineUser);
+
+    // Reviewer has canReview = true, canViewBudget = true, canOnlinePurchase = false
+    expect(reviewerPerms.canReview).toBe(true);
+    expect(reviewerPerms.canViewBudget).toBe(true);
+    expect(reviewerPerms.canOnlinePurchase).toBe(false);
+    expect(reviewerPerms.id).toBe('REVIEWER');
+
+    // Online Purchaser has canOnlinePurchase = true, canReview = false, canViewBudget = false
+    expect(onlinePerms.canOnlinePurchase).toBe(true);
+    expect(onlinePerms.canReview).toBe(false);
+    expect(onlinePerms.canViewBudget).toBe(false);
+    expect(onlinePerms.id).toBe('ONLINE_PURCHASER');
+  });
 });
+
 

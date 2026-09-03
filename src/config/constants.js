@@ -222,11 +222,26 @@ export function resolveUserPermissions(user) {
   
   const level = Number(user.level || 1);
   const dept = user.department || 'PD';
-  const isOnline = user.roleId === 'ONLINE_PURCHASER' || user.role_id === 'ONLINE_PURCHASER';
+  const roleIdUpper = String(user.roleId || user.role_id || user.positionKey || '').toUpperCase();
+  const isOnline = roleIdUpper === 'ONLINE_PURCHASER' || String(user.title || '').toLowerCase().includes('online');
+
+  // Special Role: Online Purchaser (Level 2 Specialized Task)
+  if (isOnline) {
+    return {
+      ...ROLES.ONLINE_PURCHASER,
+      id: 'ONLINE_PURCHASER',
+      roleId: 'ONLINE_PURCHASER',
+      positionKey: 'ONLINE_PURCHASER',
+      title: user.title || 'Online Purchaser',
+      name: user.name || user.employee_name || user.employeeName || 'Staff (Online Purchaser)',
+      department: dept || 'ALL',
+      level: 2,
+    };
+  }
 
   return {
-    id: user.roleId || user.role_id || (level >= 99 ? 'ADMIN' : level >= 3 ? 'APPROVER' : level >= 2 ? (isOnline ? 'ONLINE_PURCHASER' : 'REVIEWER') : 'REQUESTER'),
-    title: user.title || (level >= 99 ? 'System Admin' : level >= 3 ? `Plant Manager (${dept})` : level >= 2 ? (isOnline ? 'Online Purchaser' : `Asst. Manager (${dept})`) : `Requester (${dept})`),
+    id: user.roleId || user.role_id || (level >= 99 ? 'ADMIN' : level >= 3 ? 'APPROVER' : level >= 2 ? 'REVIEWER' : 'REQUESTER'),
+    title: user.title || (level >= 99 ? 'System Admin' : level >= 3 ? `Plant Manager (${dept})` : level >= 2 ? `Asst. Manager (${dept})` : `Requester (${dept})`),
     name: user.name || user.employee_name || user.employeeName || 'Staff',
     department: dept,
     level: level,
@@ -251,7 +266,7 @@ export function resolveUserPermissions(user) {
     canSetBudget: level >= 3,
 
     // ─── SPECIAL TASK PERMISSIONS ───
-    canOnlinePurchase: isOnline || level >= 99,
+    canOnlinePurchase: level >= 99,
 
     // ─── ADMIN ONLY PERMISSIONS (ผู้ดูแลระบบเท่านั้น) ───
     canViewAuditLogs: level >= 99,
