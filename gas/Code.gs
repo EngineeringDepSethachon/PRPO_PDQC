@@ -247,23 +247,40 @@ function doPost(e) {
     } else if (action === 'syncAllData') {
       responseData = apiSyncAllData(body.payload, body.user);
     } else if (action === 'savePR') {
-      responseData = apiSavePR(body.prData || body.payload, body.user);
+      const prData = (body.payload && (body.payload.prData || body.payload)) || body.prData || body;
+      responseData = apiSavePR(prData, body.user);
+    } else if (action === 'savePO') {
+      const poData = (body.payload && (body.payload.poData || body.payload)) || body.poData || body;
+      responseData = apiSavePO(poData, body.user);
     } else if (action === 'approvePR') {
-      responseData = apiApprovePRAndCreatePO(body.prId, body.user);
+      responseData = apiApprovePRAndCreatePO(body.prId || body.payload?.prId, body.user);
     } else if (action === 'receiveGoods') {
-      responseData = apiReceiveGoods(body.poId, body.receivingItems, body.user, body.note);
+      responseData = apiReceiveGoods(body.poId || body.payload?.poId, body.receivingItems || body.payload?.receivingItems, body.user, body.note || body.payload?.note);
     } else if (action === 'quickIssue') {
-      responseData = apiQuickIssue(body.issueData || body.payload, body.user);
+      const issueData = (body.payload && (body.payload.issueData || body.payload)) || body.issueData || body;
+      responseData = apiQuickIssue(issueData, body.user);
     } else if (action === 'saveProduct') {
-      responseData = apiSaveProduct(body.product || body.payload, body.user);
+      const product = (body.payload && (body.payload.product || body.payload)) || body.product || body;
+      responseData = apiSaveProduct(product, body.user);
+    } else if (action === 'saveProductsBulk') {
+      const prods = (body.payload && (body.payload.products || body.payload)) || body.products || [];
+      responseData = apiSaveProductsBulk(prods, body.user);
     } else if (action === 'saveVendor') {
-      responseData = apiSaveVendor(body.vendor || body.payload, body.user);
+      const vendor = (body.payload && (body.payload.vendor || body.payload)) || body.vendor || body;
+      responseData = apiSaveVendor(vendor, body.user);
     } else if (action === 'saveStorageLocation') {
-      responseData = apiSaveStorageLocation(body.location || body.payload, body.user);
+      const location = (body.payload && (body.payload.location || body.payload)) || body.location || body;
+      responseData = apiSaveStorageLocation(location, body.user);
+    } else if (action === 'saveStockLog') {
+      const logData = (body.payload && (body.payload.logData || body.payload)) || body.logData || body;
+      responseData = apiSaveStockLog(logData, body.user);
+    } else if (action === 'saveStockLogsBulk') {
+      const logs = (body.payload && (body.payload.logs || body.payload)) || body.logs || [];
+      responseData = apiSaveStockLogsBulk(logs, body.user);
     } else if (action === 'deleteStorageLocation') {
-      responseData = apiDeleteStorageLocation(body.locationId, body.options, body.user);
+      responseData = apiDeleteStorageLocation(body.locationId || body.payload?.locationId, body.options || body.payload?.options, body.user);
     } else if (action === 'updateBudget') {
-      responseData = apiUpdateBudget(body.department, body.amount, body.user);
+      responseData = apiUpdateBudget(body.department || body.payload?.department, body.amount || body.payload?.amount, body.user);
     } else if (action === 'login') {
       responseData = apiLoginUser(body.username, body.password, body.ipAddress || body.clientIp, body.userAgent);
     } else if (action === 'savePdpaConsent') {
@@ -312,6 +329,13 @@ const DEFAULT_MASTER_USERS = [
  */
 function apiGetInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Auto-seed Master Data (Locations, Products, Vendors, Budgets) if Products sheet is empty
+  const prodSheet = ss.getSheetByName('Products');
+  if (prodSheet && prodSheet.getLastRow() <= 1) {
+    seedMasterData(ss);
+  }
+
   const users = getSheetRecords(ss, 'Users');
 
   // Only seed default users if the Users sheet is completely empty (first-time initialization)
@@ -387,7 +411,12 @@ function apiSyncAllData(payload, user) {
       overwriteSheetRecords(ss, 'Notifications', payload.notifications, ['targetRoles']);
     }
     if (payload.users && Array.isArray(payload.users)) {
-      overwriteSheetRecords(ss, 'Users', payload.users);
+      const existingUsers = getSheetRecords(ss, 'Users');
+      const safeUsers = payload.users.map(u => {
+        const match = existingUsers.find(eu => String(eu.id) === String(u.id) || String(eu.username || '').toLowerCase() === String(u.username || '').toLowerCase());
+        return match ? { ...u, password: match.password } : u;
+      });
+      overwriteSheetRecords(ss, 'Users', safeUsers);
     }
 
     apiLogAudit('SYNC_ALL_DATA', user?.name || 'System User', user?.title || 'Admin', '-', 'ซิงค์และสำรองข้อมูลทั้งหมดเข้า Google Sheets');
@@ -407,37 +436,40 @@ function apiSavePR(prData, user) {
   lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const dept = prData.department || 'PD';
+    const pr = (prData && prData.prData) ? prData.prData : (prData && prData.payload) ? prData.payload : prData;
+    if (!pr || typeof pr !== 'object') throw new Error('Invalid PR data');
+
+    const dept = pr.department || 'PD';
     
-    if (!prData.prNumber) {
-      if (prData.prNo) {
-        prData.prNumber = prData.prNo;
+    if (!pr.prNumber) {
+      if (pr.prNo) {
+        pr.prNumber = pr.prNo;
       } else {
         const year = new Date().getFullYear().toString().slice(-2);
         const month = String(new Date().getMonth() + 1).padStart(2, '0');
         const prefix = `PR-${dept}-${year}${month}-`;
         const prs = getSheetRecords(ss, 'PRs');
         const count = prs.filter(p => p.prNumber && p.prNumber.startsWith(prefix)).length + 1;
-        prData.prNumber = `${prefix}${String(count).padStart(3, '0')}`;
+        pr.prNumber = `${prefix}${String(count).padStart(3, '0')}`;
       }
     }
-    prData.prNo = prData.prNumber;
-    prData.totalAmount = parseFloat(prData.totalAmount) || 0;
+    pr.prNo = pr.prNumber;
+    pr.totalAmount = parseFloat(pr.totalAmount) || 0;
 
-    if (!prData.id) prData.id = 'PR-' + Date.now();
-    prData.updatedAt = new Date().toISOString();
-    if (!prData.createdAt) prData.createdAt = new Date().toISOString();
+    if (!pr.id) pr.id = 'PR-' + Date.now();
+    pr.updatedAt = new Date().toISOString();
+    if (!pr.createdAt) pr.createdAt = new Date().toISOString();
 
-    if (!prData.requester) prData.requester = prData.requestedBy || user?.name || 'Requester';
-    if (!prData.requesterName) prData.requesterName = prData.requestedBy || user?.name || 'Requester';
-    if (!prData.requestDate) prData.requestDate = prData.requestedDate || prData.createdAt;
-    if (!prData.remarks) prData.remarks = prData.note || '';
-    if (!prData.memoData) prData.memoData = prData.memo || null;
+    if (!pr.requester) pr.requester = pr.requestedBy || user?.name || 'Requester';
+    if (!pr.requesterName) pr.requesterName = pr.requestedBy || user?.name || 'Requester';
+    if (!pr.requestDate) pr.requestDate = pr.requestedDate || pr.createdAt;
+    if (!pr.remarks) pr.remarks = pr.note || '';
+    if (!pr.memoData) pr.memoData = pr.memo || null;
 
-    upsertSheetRecord(ss, 'PRs', prData, ['items', 'memoData']);
+    upsertSheetRecord(ss, 'PRs', pr, ['items', 'memoData']);
     
-    apiLogAudit('SAVE_PR', user?.name || 'Requester', user?.title || 'Staff', prData.prNumber, `บันทึก PR ยอด ${prData.totalAmount} บาท สถานะ: ${prData.status}`);
-    return { status: 'success', data: prData };
+    apiLogAudit('SAVE_PR', user?.name || pr.requester || 'Requester', user?.title || 'Staff', pr.prNumber, `บันทึก PR ยอด ${pr.totalAmount} บาท สถานะ: ${pr.status}`);
+    return { status: 'success', data: pr };
   } finally {
     lock.releaseLock();
   }
@@ -513,6 +545,30 @@ function apiApprovePRAndCreatePO(prId, user) {
     
     return { status: 'success', data: { pr, po: poData } };
 
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * บันทึกหรือสร้างเอกสาร PO (Purchase Order)
+ */
+function apiSavePO(poData, user) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const po = (poData && poData.poData) ? poData.poData : (poData && poData.payload) ? poData.payload : poData;
+    if (!po || typeof po !== 'object') throw new Error('Invalid PO data');
+
+    if (!po.id) po.id = 'PO-' + Date.now();
+    po.updatedAt = new Date().toISOString();
+    if (!po.createdAt) po.createdAt = new Date().toISOString();
+    if (!po.poNumber) po.poNumber = po.id;
+
+    upsertSheetRecord(ss, 'POs', po, ['items', 'claims']);
+    apiLogAudit('SAVE_PO', user?.name || 'Staff', user?.title || 'Staff', po.poNumber, `บันทึกใบสั่งซื้อ PO: ${po.poNumber} สถานะ: ${po.status || '-'}`);
+    return { status: 'success', data: po };
   } finally {
     lock.releaseLock();
   }
@@ -650,11 +706,36 @@ function apiSaveProduct(product, user) {
   lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!product.id) product.id = `PROD-${product.category || 'PD'}-${Date.now()}`;
-    product.updatedAt = new Date().toISOString();
-    upsertSheetRecord(ss, 'Products', product);
-    apiLogAudit('SAVE_PRODUCT', user?.name || 'Staff', user?.title || 'Manager', product.code, `บันทึกข้อมูลสินค้า: ${product.name}`);
-    return { status: 'success', data: product };
+    const prod = (product && product.product) ? product.product : (product && product.payload) ? product.payload : product;
+    if (!prod || typeof prod !== 'object') throw new Error('Invalid product data');
+
+    if (!prod.id) prod.id = `PROD-${prod.category || prod.department || 'PD'}-${Date.now()}`;
+    prod.updatedAt = new Date().toISOString();
+    upsertSheetRecord(ss, 'Products', prod);
+    apiLogAudit('SAVE_PRODUCT', user?.name || 'Staff', user?.title || 'Manager', prod.code || prod.id, `บันทึกข้อมูลสินค้า: ${prod.name}`);
+    return { status: 'success', data: prod };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * บันทึกข้อมูลสินค้าแบบกลุ่ม (Bulk Products Sync)
+ */
+function apiSaveProductsBulk(products, user) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const prods = (products && products.products) ? products.products : (products && products.payload) ? products.payload : (Array.isArray(products) ? products : []);
+    if (Array.isArray(prods)) {
+      prods.forEach(prod => {
+        if (!prod.id) prod.id = `PROD-${prod.category || prod.department || 'PD'}-${Date.now()}`;
+        prod.updatedAt = new Date().toISOString();
+        upsertSheetRecord(ss, 'Products', prod);
+      });
+    }
+    return { status: 'success', count: Array.isArray(prods) ? prods.length : 0 };
   } finally {
     lock.releaseLock();
   }
@@ -668,11 +749,14 @@ function apiSaveVendor(vendor, user) {
   lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!vendor.id) vendor.id = `VEND-${Date.now()}`;
-    vendor.updatedAt = new Date().toISOString();
-    upsertSheetRecord(ss, 'Vendors', vendor);
-    apiLogAudit('SAVE_VENDOR', user?.name || 'Staff', user?.title || 'Manager', vendor.name, `บันทึกข้อมูลผู้ขาย: ${vendor.name}`);
-    return { status: 'success', data: vendor };
+    const v = (vendor && vendor.vendor) ? vendor.vendor : (vendor && vendor.payload) ? vendor.payload : vendor;
+    if (!v || typeof v !== 'object') throw new Error('Invalid vendor data');
+
+    if (!v.id) v.id = `VEND-${Date.now()}`;
+    v.updatedAt = new Date().toISOString();
+    upsertSheetRecord(ss, 'Vendors', v);
+    apiLogAudit('SAVE_VENDOR', user?.name || 'Staff', user?.title || 'Manager', v.name, `บันทึกข้อมูลผู้ขาย: ${v.name}`);
+    return { status: 'success', data: v };
   } finally {
     lock.releaseLock();
   }
@@ -686,11 +770,56 @@ function apiSaveStorageLocation(location, user) {
   lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!location.id) location.id = `LOC-${location.department || 'GEN'}-${Date.now()}`;
-    location.updatedAt = new Date().toISOString();
-    upsertSheetRecord(ss, 'StorageLocations', location);
-    apiLogAudit('SAVE_LOCATION', user?.name || 'Staff', user?.title || 'Manager', location.name, `บันทึกจุดจัดเก็บ: ${location.name}`);
-    return { status: 'success', data: location };
+    const loc = (location && location.location) ? location.location : (location && location.payload) ? location.payload : location;
+    if (!loc || typeof loc !== 'object') throw new Error('Invalid location data');
+
+    if (!loc.id) loc.id = `LOC-${loc.department || 'GEN'}-${Date.now()}`;
+    loc.updatedAt = new Date().toISOString();
+    upsertSheetRecord(ss, 'StorageLocations', loc);
+    apiLogAudit('SAVE_LOCATION', user?.name || 'Staff', user?.title || 'Manager', loc.name, `บันทึกจุดจัดเก็บ: ${loc.name}`);
+    return { status: 'success', data: loc };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * บันทึกประวัติความเคลื่อนไหวสต็อก (StockLog)
+ */
+function apiSaveStockLog(logData, user) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const log = (logData && logData.logData) ? logData.logData : (logData && logData.payload) ? logData.payload : logData;
+    if (!log || typeof log !== 'object') throw new Error('Invalid log data');
+
+    if (!log.id) log.id = 'LOG-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+    if (!log.timestamp) log.timestamp = new Date().toISOString();
+    upsertSheetRecord(ss, 'StockLogs', log);
+    return { status: 'success', data: log };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * บันทึกประวัติสต็อกแบบกลุ่ม (Bulk StockLogs Sync)
+ */
+function apiSaveStockLogsBulk(logs, user) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const lgs = (logs && logs.logs) ? logs.logs : (logs && logs.payload) ? logs.payload : (Array.isArray(logs) ? logs : []);
+    if (Array.isArray(lgs)) {
+      lgs.forEach(log => {
+        if (!log.id) log.id = 'LOG-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+        if (!log.timestamp) log.timestamp = new Date().toISOString();
+        upsertSheetRecord(ss, 'StockLogs', log);
+      });
+    }
+    return { status: 'success', count: Array.isArray(lgs) ? lgs.length : 0 };
   } finally {
     lock.releaseLock();
   }

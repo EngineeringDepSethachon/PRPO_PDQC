@@ -139,6 +139,18 @@ export const apiService = {
         console.warn('[ApiService] Background savePR status update to GAS failed:', err);
       });
     }
+    // If a PO was generated upon approval, sync the PO to GAS
+    if (res?.po) {
+      gasService.sendMutation('savePO', { poData: res.po }, user).catch(err => {
+        console.warn('[ApiService] Background savePO to GAS failed:', err);
+      });
+    }
+    // If budget was updated upon approval, sync budget to GAS
+    if (res?.budget && pr?.department) {
+      gasService.sendMutation('updateBudget', { department: pr.department, amount: res.budget.monthlyBudget }, user).catch(err => {
+        console.warn('[ApiService] Background updateBudget to GAS failed:', err);
+      });
+    }
     return res;
   },
 
@@ -173,49 +185,113 @@ export const apiService = {
   },
 
   async cancelPO(poId, user, reason) {
-    return workflowEngine.cancelPO(poId, user, reason);
+    const res = await workflowEngine.cancelPO(poId, user, reason);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(err => {
+        console.warn('[ApiService] Background savePO cancel to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   async acknowledgeOnlineTask(poId, vendorName, user, updatedItems = null, varianceNote = '') {
-    return workflowEngine.acknowledgeOnlineTask(poId, vendorName, user, updatedItems, varianceNote);
+    const res = await workflowEngine.acknowledgeOnlineTask(poId, vendorName, user, updatedItems, varianceNote);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(err => {
+        console.warn('[ApiService] Background savePO acknowledge to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   // --- PO & Receive Goods Operations ---
   async assignVendor(poId, vendorId, customVendorName, user) {
-    return workflowEngine.assignVendor(poId, vendorId, customVendorName, user);
+    const res = await workflowEngine.assignVendor(poId, vendorId, customVendorName, user);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(err => {
+        console.warn('[ApiService] Background savePO assignVendor to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   // Generic claim filing — supports both ONLINE and SELF-BUY channels
   async fileClaim(poId, claimData, user) {
-    return workflowEngine.fileClaim(poId, claimData, user);
+    const res = await workflowEngine.fileClaim(poId, claimData, user);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
   async fileOnlineClaim(poId, claimData, user) {
-    return workflowEngine.fileClaim(poId, claimData, user);
+    return this.fileClaim(poId, claimData, user);
   },
 
   // Generic claim resolution — supports both ONLINE and SELF-BUY channels
   async resolveClaim(poId, resolution, user) {
-    return workflowEngine.resolveClaim(poId, resolution, user);
+    const res = await workflowEngine.resolveClaim(poId, resolution, user);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
   async resolveOnlineClaim(poId, resolution, user) {
-    return workflowEngine.resolveClaim(poId, resolution, user);
+    return this.resolveClaim(poId, resolution, user);
   },
 
   async updatePOStatus(poId, nextStatus, user, note = '') {
-    return workflowEngine.updatePOStatus(poId, nextStatus, user, note);
+    const res = await workflowEngine.updatePOStatus(poId, nextStatus, user, note);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
 
   async updateActualPrice(poId, itemIndex, actPrice, user) {
-    return workflowEngine.updateActualPrice(poId, itemIndex, actPrice, user);
+    const res = await workflowEngine.updateActualPrice(poId, itemIndex, actPrice, user);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
 
   async closePO(poId, user, note = '') {
-    return workflowEngine.closePO(poId, user, note);
+    const res = await workflowEngine.closePO(poId, user, note);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
 
   // Partial or Full goods receiving — handles PARTIAL → CLOSED transitions
   async receiveGoods(poId, receivingItems, user, note = '', options = {}) {
-    return workflowEngine.receiveGoods(poId, receivingItems, user, note, options);
+    const res = await workflowEngine.receiveGoods(poId, receivingItems, user, note, options);
+    // 1. Sync updated PO to GAS
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(err => {
+        console.warn('[ApiService] Background savePO receiveGoods to GAS failed:', err);
+      });
+    }
+    // 2. Sync updated Products inventory to GAS
+    const products = storageService.getProducts();
+    gasService.sendMutation('saveProductsBulk', { products }, user).catch(err => {
+      console.warn('[ApiService] Background saveProductsBulk to GAS failed:', err);
+    });
+    // 3. Sync latest StockLogs to GAS
+    const stockLogs = storageService.getStockLogs().slice(0, 20);
+    gasService.sendMutation('saveStockLogsBulk', { logs: stockLogs }, user).catch(err => {
+      console.warn('[ApiService] Background saveStockLogsBulk to GAS failed:', err);
+    });
+    return res;
   },
 
   async receiveAllGoods(poId, user, note = '', options = {}) {
@@ -227,17 +303,37 @@ export const apiService = {
       productId: item.productId,
       receivedThisTime: Number(item.orderedQty ?? item.purchaseQty ?? item.qty) - (Number(item.receivedQty) || 0)
     }));
-    return workflowEngine.receiveGoods(poId, receivingItems, user, note, options);
+    return this.receiveGoods(poId, receivingItems, user, note, options);
   },
 
   // Short-Close PO (ปิด PO ก่อนกำหนดเมื่อได้ของไม่ครบและไม่รอของแล้ว)
   async shortClosePO(poId, reason, user) {
-    return workflowEngine.shortClosePO(poId, reason, user);
+    const res = await workflowEngine.shortClosePO(poId, reason, user);
+    const po = storageService.getPOs().find(p => p.id === poId);
+    if (po) {
+      gasService.sendMutation('savePO', { poData: po }, user).catch(console.warn);
+    }
+    return res;
   },
 
   // --- Quick Issue Stock (เบิกจ่าย) ---
   async quickIssueStock(productId, issueQty, user, note = '', issueUnit = '') {
-    return workflowEngine.quickIssueStock(productId, issueQty, user, note, issueUnit);
+    const res = await workflowEngine.quickIssueStock(productId, issueQty, user, note, issueUnit);
+    // 1. Sync updated product to GAS
+    const product = storageService.getProducts().find(p => p.id === productId);
+    if (product) {
+      gasService.sendMutation('saveProduct', { product }, user).catch(err => {
+        console.warn('[ApiService] Background saveProduct quickIssue to GAS failed:', err);
+      });
+    }
+    // 2. Sync latest stock log to GAS
+    const logs = storageService.getStockLogs();
+    if (logs.length > 0) {
+      gasService.sendMutation('saveStockLog', { logData: logs[0] }, user).catch(err => {
+        console.warn('[ApiService] Background saveStockLog to GAS failed:', err);
+      });
+    }
+    return res;
   },
 
   // --- Master Data CRUD ---
@@ -265,6 +361,11 @@ export const apiService = {
       products.push(product);
     }
     storageService.saveProducts(products);
+
+    // Sync product to GAS
+    gasService.sendMutation('saveProduct', { product }, user).catch(err => {
+      console.warn('[ApiService] Background saveProduct to GAS failed:', err);
+    });
 
     auditService.logAction({
       action: isUpdate ? 'PRODUCT_UPDATED' : 'PRODUCT_CREATED',
@@ -294,10 +395,15 @@ export const apiService = {
       const idx = vendors.findIndex(v => v.id === vendor.id);
       if (idx !== -1) vendors[idx] = vendor;
     } else {
-      vendor.id = `VEN-${Date.now()}`;
+      vendor.id = `VEND-${Date.now()}`;
       vendors.push(vendor);
     }
     storageService.saveVendors(vendors);
+
+    // Sync vendor to GAS
+    gasService.sendMutation('saveVendor', { vendor }, user).catch(err => {
+      console.warn('[ApiService] Background saveVendor to GAS failed:', err);
+    });
 
     auditService.logAction({
       action: isUpdate ? 'VENDOR_UPDATED' : 'VENDOR_CREATED',
@@ -325,6 +431,11 @@ export const apiService = {
 
     const saved = storageService.saveStorageLocation(location);
 
+    // Sync storage location to GAS
+    gasService.sendMutation('saveStorageLocation', { location: saved }, user).catch(err => {
+      console.warn('[ApiService] Background saveStorageLocation to GAS failed:', err);
+    });
+
     auditService.logAction({
       action: isUpdate ? 'LOCATION_UPDATED' : 'LOCATION_CREATED',
       actor: user || 'Admin / Warehouse Manager',
@@ -343,6 +454,11 @@ export const apiService = {
     
     // storageService.deleteStorageLocation will perform integrity check & reassign/unlink
     storageService.deleteStorageLocation(locationId, options);
+
+    // Sync delete location to GAS
+    gasService.sendMutation('deleteStorageLocation', { locationId, options }, user).catch(err => {
+      console.warn('[ApiService] Background deleteStorageLocation to GAS failed:', err);
+    });
 
     if (loc) {
       auditService.logAction({

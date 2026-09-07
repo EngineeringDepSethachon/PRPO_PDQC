@@ -82,6 +82,11 @@ export default function App() {
           setPOs(await apiService.getPOs());
           setStockLogs(await apiService.getStockLogs());
           setBudgetSummary(apiService.calculateBudgetSummary());
+
+          // If Google Sheets database is empty (0 products), auto-sync local master data to Google Sheets
+          if (!gasData.products || gasData.products.length === 0) {
+            apiService.syncAllToGAS({ name: 'System Auto-Seed' }).catch(console.warn);
+          }
         }
       } catch (e) {
         console.warn('[App] GAS sync skipped or offline:', e);

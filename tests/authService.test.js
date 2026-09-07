@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import './setup.js';
 import { authService, DEFAULT_EMPLOYEE_ACCOUNTS } from '../src/services/authService';
+import { gasService } from '../src/services/gasService';
 
 describe('Scenario 8: Username/Password Authentication & Multi-Role Verification', { timeout: 30000 }, () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.spyOn(gasService, 'isConfigured').mockReturnValue(false);
   });
 
   it('Default employee accounts are available for each position', () => {
