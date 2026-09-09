@@ -205,7 +205,7 @@ export const authService = {
       const data = localStorage.getItem(REGISTERED_USERS_KEY);
       if (!data) return DEFAULT_EMPLOYEE_ACCOUNTS;
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
       return DEFAULT_EMPLOYEE_ACCOUNTS;

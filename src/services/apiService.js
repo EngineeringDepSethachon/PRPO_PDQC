@@ -2,6 +2,7 @@ import { storageService } from './storageService';
 import { workflowEngine } from './workflowEngine';
 import { auditService } from './auditService';
 import { gasService } from './gasService';
+import { authService } from './authService';
 import { PO_STATUS } from '../config/constants';
 
 // API Service Layer for Data & Operations
@@ -498,6 +499,79 @@ export const apiService = {
         docNo: loc.id,
         docType: 'LOCATION',
         details: `ลบจุดจัดเก็บสินค้า "${loc.name}" ออกจากระบบ${options.unlinkProducts ? ' (ปลดสินค้าที่ผูกอยู่ออก)' : options.reassignToLocationId ? ' (ย้ายสินค้าไปยังจุดจัดเก็บใหม่)' : ''}`
+      });
+    }
+
+    return true;
+  },
+
+  async deleteProduct(productId, user = null) {
+    const products = storageService.getProducts();
+    const prod = products.find(p => p.id === productId);
+    storageService.deleteProduct(productId);
+
+    // Sync delete product to GAS
+    gasService.sendMutation('deleteProduct', { productId }, user).catch(err => {
+      console.warn('[ApiService] Background deleteProduct to GAS failed:', err);
+    });
+
+    if (prod) {
+      auditService.logAction({
+        action: 'PRODUCT_DELETED',
+        actor: user || 'Staff / Warehouse',
+        department: prod.category || prod.department || 'ALL',
+        docNo: prod.code || prod.id,
+        docType: 'PRODUCT',
+        details: `ลบข้อมูลสินค้า "${prod.name}" (${prod.code || prod.id}) ออกจากระบบ`
+      });
+    }
+
+    return true;
+  },
+
+  async deleteVendor(vendorId, user = null) {
+    const vendors = storageService.getVendors();
+    const vendor = vendors.find(v => v.id === vendorId);
+    storageService.deleteVendor(vendorId);
+
+    // Sync delete vendor to GAS
+    gasService.sendMutation('deleteVendor', { vendorId }, user).catch(err => {
+      console.warn('[ApiService] Background deleteVendor to GAS failed:', err);
+    });
+
+    if (vendor) {
+      auditService.logAction({
+        action: 'VENDOR_DELETED',
+        actor: user || 'Purchaser / Admin',
+        department: vendor.department || 'ALL',
+        docNo: vendor.id,
+        docType: 'VENDOR',
+        details: `ลบข้อมูลผู้จัดจำหน่าย "${vendor.name}" ออกจากระบบ`
+      });
+    }
+
+    return true;
+  },
+
+  async deleteUser(userId, user = null) {
+    const users = authService.getRegisteredUsers();
+    const targetUser = users.find(u => u.id === userId || u.employeeId === userId);
+    const filtered = users.filter(u => u.id !== userId && u.employeeId !== userId);
+    authService.saveRegisteredUsers(filtered);
+
+    // Sync delete user to GAS
+    gasService.sendMutation('deleteUser', { userId }, user).catch(err => {
+      console.warn('[ApiService] Background deleteUser to GAS failed:', err);
+    });
+
+    if (targetUser) {
+      auditService.logAction({
+        action: 'USER_DELETED',
+        actor: user || 'Admin',
+        department: targetUser.department || 'ALL',
+        docNo: targetUser.employeeId || targetUser.id,
+        docType: 'USER',
+        details: `ลบบัญชีผู้ใช้งาน "${targetUser.name || targetUser.username}" ออกจากระบบ`
       });
     }
 

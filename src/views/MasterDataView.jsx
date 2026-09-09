@@ -11,7 +11,14 @@ import { authService } from '../services/authService';
 import { modalService } from '../services/modalService';
 
 
-export default function MasterDataView({ products = [], vendors = [], currentRole, onRefresh }) {
+export default function MasterDataView({
+  products = [],
+  vendors = [],
+  storageLocations = [],
+  users = [],
+  currentRole,
+  onRefresh
+}) {
   const [activeTab, setActiveTab] = useState('products');
   const [showProdModal, setShowProdModal] = useState(false);
   const [showVendorModal, setShowVendorModal] = useState(false);
@@ -20,11 +27,6 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
   const [editVendor, setEditVendor] = useState(null);
   const [editLocation, setEditLocation] = useState(null);
   const [deleteLocationItem, setDeleteLocationItem] = useState(null);
-  const [locsList, setLocsList] = useState(() => storageService.getStorageLocations());
-
-  useEffect(() => {
-    setLocsList(storageService.getStorageLocations());
-  }, [products]);
 
   // Search & Dept Filter States
   const [prodSearch, setProdSearch] = useState('');
@@ -39,10 +41,7 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
   const isAdmin = currentRole?.id === 'ADMIN' || currentRole?.roleId === 'ADMIN' || Number(currentRole?.level) >= 99;
   const canDeleteMaster = currentRole?.canDeleteMaster || currentRole?.canManageMaster || isAdmin;
 
-  // Retrieve Storage Locations
-  const storageLocations = useMemo(() => {
-    return storageService.getStorageLocations();
-  }, [products]); // Re-evaluate when products refresh
+
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
@@ -79,7 +78,7 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
 
   // Filtered Storage Locations (Clean Simple by Name)
   const filteredLocations = useMemo(() => {
-    return locsList.filter(l => {
+    return storageLocations.filter(l => {
       const matchesDeptRole = canSeeAll || l.department === myDept || l.department === 'ALL';
       const matchesDeptFilter = locDeptFilter === 'ALL' || l.department === locDeptFilter;
       const q = locSearch.trim().toLowerCase();
@@ -88,20 +87,15 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
       );
       return matchesDeptRole && matchesDeptFilter && matchesSearch;
     });
-  }, [locsList, canSeeAll, myDept, locDeptFilter, locSearch]);
+  }, [storageLocations, canSeeAll, myDept, locDeptFilter, locSearch]);
 
   // Users State & Filter
-  const [usersList, setUsersList] = useState(() => authService.getRegisteredUsers());
   const [userSearch, setUserSearch] = useState('');
   const [userDeptFilter, setUserDeptFilter] = useState('ALL');
   const [visiblePasswords, setVisiblePasswords] = useState({});
 
-  useEffect(() => {
-    setUsersList(authService.getRegisteredUsers());
-  }, [products]);
-
   const filteredUsers = useMemo(() => {
-    return usersList.filter(u => {
+    return users.filter(u => {
       const matchesDept = userDeptFilter === 'ALL' || u.department === userDeptFilter || u.department === 'ALL';
       const q = userSearch.trim().toLowerCase();
       const matchesSearch = !q || (
@@ -114,7 +108,7 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
       );
       return matchesDept && matchesSearch;
     });
-  }, [usersList, userDeptFilter, userSearch]);
+  }, [users, userDeptFilter, userSearch]);
 
   // Access check
 
@@ -142,10 +136,13 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
       cancelText: 'ยกเลิก'
     });
     if (!confirmed) return;
-    const prods = storageService.getProducts().filter(p => p.id !== prod.id);
-    storageService.saveProducts(prods);
-    modalService.success('ลบสินค้าสำเร็จ', `ลบ "${prod.name}" เรียบร้อยแล้ว`);
-    onRefresh();
+    try {
+      await apiService.deleteProduct(prod.id, `${currentRole?.name} (${currentRole?.title})`);
+      modalService.success('ลบสินค้าสำเร็จ', `ลบ "${prod.name}" เรียบร้อยแล้ว`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      modalService.error('เกิดข้อผิดพลาด', err.message);
+    }
   };
 
   const handleDeleteVendor = async (vendor) => {
@@ -158,10 +155,13 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
       cancelText: 'ยกเลิก'
     });
     if (!confirmed) return;
-    const vends = storageService.getVendors().filter(v => v.id !== vendor.id);
-    storageService.saveVendors(vends);
-    modalService.success('ลบผู้ขายสำเร็จ', `ลบ "${vendor.name}" เรียบร้อยแล้ว`);
-    onRefresh();
+    try {
+      await apiService.deleteVendor(vendor.id, `${currentRole?.name} (${currentRole?.title})`);
+      modalService.success('ลบผู้ขายสำเร็จ', `ลบ "${vendor.name}" เรียบร้อยแล้ว`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      modalService.error('เกิดข้อผิดพลาด', err.message);
+    }
   };
 
   // ─── Requirement 1: Data Integrity Guardrail on Delete ───
@@ -806,7 +806,7 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
           product={editProd}
           products={products}
           vendors={vendors}
-          storageLocations={locsList}
+          storageLocations={storageLocations}
           currentRole={currentRole}
           onClose={() => { setShowProdModal(false); setEditProd(null); }}
           onRefresh={onRefresh}
@@ -828,15 +828,13 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
         <StorageLocationCRUDModal
           editLocation={editLocation}
           location={editLocation}
-          storageLocations={locsList}
+          storageLocations={storageLocations}
           currentRole={currentRole}
           onClose={() => { setShowLocationModal(false); setEditLocation(null); }}
-          onSaved={(saved) => {
-            setLocsList(prev => prev.map(l => l.id === saved.id ? saved : l));
+          onSaved={() => {
             if (onRefresh) onRefresh();
           }}
-          onCreated={(created) => {
-            setLocsList(prev => [created, ...prev.filter(l => l.id !== created.id)]);
+          onCreated={() => {
             if (onRefresh) onRefresh();
           }}
         />
@@ -846,11 +844,10 @@ export default function MasterDataView({ products = [], vendors = [], currentRol
         <DeleteLocationModal
           location={deleteLocationItem}
           products={products}
-          storageLocations={locsList}
+          storageLocations={storageLocations}
           currentRole={currentRole}
           onClose={() => setDeleteLocationItem(null)}
-          onDeleted={(deletedId) => {
-            setLocsList(prev => prev.filter(l => l.id !== deletedId));
+          onDeleted={() => {
             if (onRefresh) onRefresh();
           }}
         />

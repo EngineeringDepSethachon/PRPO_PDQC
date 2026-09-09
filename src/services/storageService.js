@@ -1,5 +1,6 @@
 import { STORAGE_KEYS, ROLES } from '../config/constants.js';
 import { initialProducts, initialVendors, initialStorageLocations, initialPRs, initialPOs, initialStockLogs, initialBudgets, initialCounters } from '../data/mockData.js';
+import { gasService } from './gasService.js';
 
 const DATA_VERSION = 'prpo_clean_v13';
 
@@ -45,7 +46,7 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, JSON.stringify(role));
   },
 
-  // Products (with Lazy Migration)
+  // Products
   getProducts() {
     const data = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
     const products = data ? JSON.parse(data) : initialProducts;
@@ -112,6 +113,12 @@ export const storageService = {
   },
   saveProducts(products) {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+  },
+  deleteProduct(productId) {
+    const products = this.getProducts();
+    const filtered = products.filter(p => p.id !== productId);
+    this.saveProducts(filtered);
+    return true;
   },
 
   // Storage Locations (Simple Name & Department)
@@ -218,6 +225,12 @@ export const storageService = {
   },
   saveVendors(vendors) {
     localStorage.setItem(STORAGE_KEYS.VENDORS, JSON.stringify(vendors));
+  },
+  deleteVendor(vendorId) {
+    const vendors = this.getVendors();
+    const filtered = vendors.filter(v => v.id !== vendorId);
+    this.saveVendors(filtered);
+    return true;
   },
 
   // PRs (with Lazy Migration)

@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import './setup.js';
-import { ROLES } from '../src/config/constants';
+import { ROLES, STORAGE_KEYS } from '../src/config/constants';
 import { workflowEngine } from '../src/services/workflowEngine';
 import { storageService } from '../src/services/storageService';
 import { apiService } from '../src/services/apiService';
+import { authService } from '../src/services/authService';
+import { gasService } from '../src/services/gasService';
 
 describe('New System Enhancements & Business Rules Verification', () => {
   beforeEach(() => {
@@ -210,6 +212,52 @@ describe('New System Enhancements & Business Rules Verification', () => {
       expect(closedPO.status).toBe('CLOSED');
       expect(closedPO.closedEarly).toBe(true);
       expect(closedPO.shortCloseReason).toBe('ร้านค้าแจ้งเลิกผลิตสินค้ารุ่นนี้แล้ว');
+    });
+  });
+
+  describe('4. Master Data Deletion & Zero Mock Fallback with GAS', () => {
+    it('deletes product from storage and sends mutation', async () => {
+      const sendMutationSpy = vi.spyOn(gasService, 'sendMutation').mockResolvedValue({ status: 'success' });
+      await apiService.deleteProduct('PROD-1', 'Admin');
+      const products = storageService.getProducts();
+      expect(products.find(p => p.id === 'PROD-1')).toBeUndefined();
+      expect(sendMutationSpy).toHaveBeenCalledWith('deleteProduct', { productId: 'PROD-1' }, 'Admin');
+      sendMutationSpy.mockRestore();
+    });
+
+    it('deletes vendor from storage and sends mutation', async () => {
+      const sendMutationSpy = vi.spyOn(gasService, 'sendMutation').mockResolvedValue({ status: 'success' });
+      await apiService.deleteVendor('VEN-01', 'Admin');
+      const vendors = storageService.getVendors();
+      expect(vendors.find(v => v.id === 'VEN-01')).toBeUndefined();
+      expect(sendMutationSpy).toHaveBeenCalledWith('deleteVendor', { vendorId: 'VEN-01' }, 'Admin');
+      sendMutationSpy.mockRestore();
+    });
+
+    it('deletes user from registered users and sends mutation', async () => {
+      authService.saveRegisteredUsers([
+        { id: 'USR-TEST-1', username: 'testuser', name: 'Test User', department: 'PD' }
+      ]);
+      const sendMutationSpy = vi.spyOn(gasService, 'sendMutation').mockResolvedValue({ status: 'success' });
+      await apiService.deleteUser('USR-TEST-1', 'Admin');
+      const users = authService.getRegisteredUsers();
+      expect(users.find(u => u.id === 'USR-TEST-1')).toBeUndefined();
+      expect(sendMutationSpy).toHaveBeenCalledWith('deleteUser', { userId: 'USR-TEST-1' }, 'Admin');
+      sendMutationSpy.mockRestore();
+    });
+
+    it('returns empty array [] without mock fallback when Google Sheets syncs empty master data', () => {
+      storageService.loadFromGAS({
+        products: [],
+        vendors: [],
+        storageLocations: [],
+        users: []
+      });
+
+      expect(storageService.getProducts()).toEqual([]);
+      expect(storageService.getVendors()).toEqual([]);
+      expect(storageService.getStorageLocations()).toEqual([]);
+      expect(authService.getRegisteredUsers()).toEqual([]);
     });
   });
 });

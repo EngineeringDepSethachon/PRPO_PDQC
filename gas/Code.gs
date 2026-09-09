@@ -279,6 +279,12 @@ function doPost(e) {
       responseData = apiSaveStockLogsBulk(logs, body.user);
     } else if (action === 'deleteStorageLocation') {
       responseData = apiDeleteStorageLocation(body.locationId || body.payload?.locationId, body.options || body.payload?.options, body.user);
+    } else if (action === 'deleteProduct') {
+      responseData = apiDeleteProduct(body.productId || body.payload?.productId, body.user);
+    } else if (action === 'deleteVendor') {
+      responseData = apiDeleteVendor(body.vendorId || body.payload?.vendorId, body.user);
+    } else if (action === 'deleteUser') {
+      responseData = apiDeleteUser(body.userId || body.payload?.userId, body.user);
     } else if (action === 'updateBudget') {
       responseData = apiUpdateBudget(body.department || body.payload?.department, body.amount || body.payload?.amount, body.user);
     } else if (action === 'login') {
@@ -330,22 +336,7 @@ const DEFAULT_MASTER_USERS = [
 function apiGetInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Auto-seed Master Data (Locations, Products, Vendors, Budgets) if Products sheet is empty
-  const prodSheet = ss.getSheetByName('Products');
-  if (prodSheet && prodSheet.getLastRow() <= 1) {
-    seedMasterData(ss);
-  }
-
   const users = getSheetRecords(ss, 'Users');
-
-  // Only seed default users if the Users sheet is completely empty (first-time initialization)
-  if (users.length === 0) {
-    DEFAULT_MASTER_USERS.forEach(mu => {
-      const record = { ...mu, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      upsertSheetRecord(ss, 'Users', record);
-      users.push(record);
-    });
-  }
 
   const rawPRs = getSheetRecords(ss, 'PRs', ['items', 'memoData']);
   const formattedPRs = rawPRs.map(pr => ({
@@ -845,6 +836,57 @@ function apiDeleteStorageLocation(locationId, options, user) {
     }
     apiLogAudit('DELETE_LOCATION', user?.name || 'Staff', user?.title || 'Manager', locationId, `ลบจุดจัดเก็บรหัส: ${locationId}`);
     return { status: 'success', locationId };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ลบสินค้า Master Data
+ */
+function apiDeleteProduct(productId, user) {
+  return apiDeleteSheetRecord('Products', productId, user, 'DELETE_PRODUCT', 'ลบสินค้า');
+}
+
+/**
+ * ลบผู้จัดจำหน่าย Master Data
+ */
+function apiDeleteVendor(vendorId, user) {
+  return apiDeleteSheetRecord('Vendors', vendorId, user, 'DELETE_VENDOR', 'ลบผู้ขาย');
+}
+
+/**
+ * ลบผู้ใช้งานจากตารางชีต Users
+ */
+function apiDeleteUser(userId, user) {
+  return apiDeleteSheetRecord('Users', userId, user, 'DELETE_USER', 'ลบผู้ใช้งาน');
+}
+
+/**
+ * ฟังก์ชันกลางสำหรับลบแถวข้อมูลตาม ID ในชีตใดๆ
+ */
+function apiDeleteSheetRecord(sheetName, recordId, user, actionName, actionDesc) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return { status: 'error', message: 'Sheet not found: ' + sheetName };
+
+    const values = sheet.getDataRange().getValues();
+    if (values.length <= 1) return { status: 'notFound', id: recordId };
+
+    const headers = values[0];
+    const idIdx = headers.indexOf('id') !== -1 ? headers.indexOf('id') : 0;
+
+    for (let r = 1; r < values.length; r++) {
+      if (String(values[r][idIdx]) === String(recordId)) {
+        sheet.deleteRow(r + 1);
+        apiLogAudit(actionName || 'DELETE_RECORD', user?.name || 'Staff', user?.title || 'Manager', recordId, `${actionDesc || 'ลบข้อมูล'}: ${recordId}`);
+        return { status: 'success', id: recordId };
+      }
+    }
+    return { status: 'notFound', id: recordId };
   } finally {
     lock.releaseLock();
   }

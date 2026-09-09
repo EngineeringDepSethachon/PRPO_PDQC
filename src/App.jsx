@@ -36,6 +36,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [storageLocations, setStorageLocations] = useState([]);
+  const [users, setUsers] = useState([]);
   const [prs, setPRs] = useState([]);
   const [pos, setPOs] = useState([]);
   const [stockLogs, setStockLogs] = useState([]);
@@ -56,6 +57,7 @@ export default function App() {
     const p = await apiService.getProducts();
     const v = await apiService.getVendors();
     const locs = await apiService.getStorageLocations();
+    const u = authService.getRegisteredUsers();
     const pr = await apiService.getPRs();
     const po = await apiService.getPOs();
     const log = await apiService.getStockLogs();
@@ -64,6 +66,7 @@ export default function App() {
     setProducts(p);
     setVendors(v);
     setStorageLocations(locs);
+    setUsers(u);
     setPRs(pr);
     setPOs(po);
     setStockLogs(log);
@@ -78,6 +81,7 @@ export default function App() {
           setProducts(await apiService.getProducts());
           setVendors(await apiService.getVendors());
           setStorageLocations(await apiService.getStorageLocations());
+          setUsers(authService.getRegisteredUsers());
           setPRs(await apiService.getPRs());
           setPOs(await apiService.getPOs());
           setStockLogs(await apiService.getStockLogs());
@@ -298,6 +302,7 @@ export default function App() {
               products={products}
               vendors={vendors}
               storageLocations={storageLocations}
+              users={users}
               currentRole={currentRole}
               onRefresh={refreshData}
             />
