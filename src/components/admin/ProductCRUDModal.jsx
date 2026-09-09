@@ -36,34 +36,37 @@ export default function ProductCRUDModal({
   const [conversionRate, setConversionRate] = useState(editProd?.conversionRate ?? 1);
   const [selectedSupplierId, setSelectedSupplierId] = useState(editProd?.supplierId || '');
   const [selectedLocationId, setSelectedLocationId] = useState(editProd?.locationId || '');
-  const [locsList, setLocsList] = useState(() => storageLocations.length > 0 ? storageLocations : storageService.getStorageLocations());
+  const [locsList, setLocsList] = useState(() => {
+    const list = storageLocations && storageLocations.length > 0 ? storageLocations : storageService.getStorageLocations();
+    return Array.isArray(list) ? list.filter(Boolean) : [];
+  });
   const [showCreateLocModal, setShowCreateLocModal] = useState(false);
   const [editLocItem, setEditLocItem] = useState(null);
   const [deleteLocItem, setDeleteLocItem] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (storageLocations.length > 0) {
-      setLocsList(storageLocations);
-    } else {
-      setLocsList(storageService.getStorageLocations());
-    }
+    const list = storageLocations && storageLocations.length > 0 ? storageLocations : storageService.getStorageLocations();
+    setLocsList(Array.isArray(list) ? list.filter(Boolean) : []);
   }, [storageLocations]);
 
   // Duplicate Item Code Check (Case-insensitive + trimmed)
   const allProducts = useMemo(() => {
-    return products.length > 0 ? products : storageService.getProducts();
+    const list = products && products.length > 0 ? products : storageService.getProducts();
+    return Array.isArray(list) ? list.filter(Boolean) : [];
   }, [products]);
 
   const isCodeDuplicate = useMemo(() => {
-    const cleanCode = itemCode.trim().toUpperCase();
+    const cleanCode = (itemCode || '').trim().toUpperCase();
     if (!cleanCode) return false;
-    return allProducts.some(p => p.id !== editProd?.id && (p.code || '').trim().toUpperCase() === cleanCode);
+    return allProducts.some(p => p && p.id !== editProd?.id && (p.code || '').trim().toUpperCase() === cleanCode);
   }, [itemCode, allProducts, editProd]);
 
   // Filter vendors visible to this role
   const visibleVendors = useMemo(() => {
-    return vendors.filter(v => {
+    const list = Array.isArray(vendors) ? vendors.filter(Boolean) : [];
+    return list.filter(v => {
+      if (!v) return false;
       if (currentRole?.canViewAllDepts) return true;
       return v.department === currentRole?.department || v.department === 'BOTH';
     });
@@ -73,12 +76,12 @@ export default function ProductCRUDModal({
     return [
       { value: '', label: '-- ไม่ระบุผู้ขายหลัก (จัดซื้อจะเลือกในใบขอซื้อ PR) --', subLabel: 'ปล่อยว่างไว้เพื่อให้ฝ่ายจัดซื้อเสนอราคา' },
       ...visibleVendors.map(v => ({
-        value: v.id,
-        label: v.name,
-        code: v.code,
+        value: v.id || '',
+        label: v.name || v.code || 'ไม่ระบุชื่อ',
+        code: v.code || '',
         subLabel: `ผู้ติดต่อ: ${v.contactPerson || '-'} • โทร: ${v.phone || '-'}`,
-        badge: v.department === 'BOTH' ? 'ใช้ร่วมกัน' : `เฉพาะ ${v.department}`,
-        keywords: `${v.code} ${v.name} ${v.contactPerson} ${v.phone}`
+        badge: v.department === 'BOTH' ? 'ใช้ร่วมกัน' : `เฉพาะ ${v.department || '-'}`,
+        keywords: `${v.code || ''} ${v.name || ''} ${v.contactPerson || ''} ${v.phone || ''}`
       }))
     ];
   }, [visibleVendors]);
@@ -86,14 +89,16 @@ export default function ProductCRUDModal({
   // Filter locations visible to product category
   const locationOptions = useMemo(() => {
     const activeCat = lockedCategory || category || 'PD';
-    const filtered = locsList.filter(l => (l.department === activeCat || l.department === 'ALL'));
+    const filtered = (Array.isArray(locsList) ? locsList : [])
+      .filter(Boolean)
+      .filter(l => l && (l.department === activeCat || l.department === 'ALL'));
     return [
       { value: '', label: '-- ยังไม่ระบุจุดจัดเก็บสินค้า --', subLabel: 'สามารถเลือกหรือระบุภายหลังได้' },
       ...filtered.map(l => ({
-        value: l.id,
-        label: l.name,
+        value: l.id || '',
+        label: l.name || 'ไม่ระบุชื่อจุดเก็บ',
         badge: l.department === 'ALL' ? 'ส่วนกลาง' : (l.department === 'PD' ? 'ฝ่ายผลิต' : 'ฝ่าย QC'),
-        keywords: `${l.name} ${l.department}`
+        keywords: `${l.name || ''} ${l.department || ''}`
       }))
     ];
   }, [locsList, lockedCategory, category]);
@@ -110,7 +115,7 @@ export default function ProductCRUDModal({
       const pUnit = formData.get('purchaseUnit')?.trim() || purchaseUnit || 'ชิ้น';
       const sUnit = formData.get('stockUnit')?.trim() || stockUnit || 'ชิ้น';
       const convRate = Number(formData.get('conversionRate')) || Number(conversionRate) || 1;
-      const selectedLoc = locsList.find(l => l.id === selectedLocationId);
+      const selectedLoc = (Array.isArray(locsList) ? locsList : []).find(l => l && l.id === selectedLocationId);
 
       const prodObj = {
         id: editProd?.id || '',
@@ -122,7 +127,7 @@ export default function ProductCRUDModal({
         conversionRate: convRate > 0 ? convRate : 1,
         unit: sUnit, // Primary unit in stock for backward compatibility
         price: Number(formData.get('price')) || 0,
-        stockBalance: editProd ? (editProd.stockBalance || 0) : (Number(formData.get('stockBalance')) || 0),
+        stockBalance: editProd ? (Number(editProd.stockBalance) || 0) : (Number(formData.get('stockBalance')) || 0),
         reorderPoint: Number(formData.get('reorderPoint')) || 0,
         leadTimeDays: Number(formData.get('leadTimeDays')) || 7,
         supplierId: selectedSupplierId || null,
@@ -170,10 +175,10 @@ export default function ProductCRUDModal({
                   {editProd ? (
                     <>
                       <span className="font-mono text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80">
-                        {editProd.code}
+                        {editProd.code || '-'}
                       </span>
                       <span className="text-xs text-slate-500 truncate max-w-md">
-                        {editProd.name}
+                        {editProd.name || '-'}
                       </span>
                     </>
                   ) : (
@@ -329,11 +334,11 @@ export default function ProductCRUDModal({
                     onAddOption={() => setShowCreateLocModal(true)}
                     addOptionLabel="เพิ่มจุดจัดเก็บใหม่"
                     onEditOption={(opt) => {
-                      const l = locsList.find(loc => loc.id === opt.value);
+                      const l = (Array.isArray(locsList) ? locsList : []).find(loc => loc && loc.id === opt?.value);
                       if (l) setEditLocItem(l);
                     }}
                     onDeleteOption={(opt) => {
-                      const l = locsList.find(loc => loc.id === opt.value);
+                      const l = (Array.isArray(locsList) ? locsList : []).find(loc => loc && loc.id === opt?.value);
                       if (l) setDeleteLocItem(l);
                     }}
                   />
@@ -461,7 +466,7 @@ export default function ProductCRUDModal({
                   </div>
                   {editProd && (
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
-                      คงเหลือในคลัง: {editProd.stockBalance} {editProd.stockUnit || editProd.unit}
+                      คงเหลือในคลัง: {editProd.stockBalance ?? 0} {editProd.stockUnit || editProd.unit || 'ชิ้น'}
                     </span>
                   )}
                 </div>

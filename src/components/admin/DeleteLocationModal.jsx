@@ -16,14 +16,16 @@ export default function DeleteLocationModal({
 
   // Find all products currently assigned to this location
   const assignedProducts = useMemo(() => {
-    return products.filter(p => p.locationId === location.id);
+    const list = Array.isArray(products) ? products.filter(Boolean) : [];
+    return list.filter(p => p && p.locationId === location.id);
   }, [products, location]);
 
   const hasAssigned = assignedProducts.length > 0;
 
   // Other available locations to reassign to
   const otherLocations = useMemo(() => {
-    return storageLocations.filter(l => l.id !== location.id);
+    const list = Array.isArray(storageLocations) ? storageLocations.filter(Boolean) : [];
+    return list.filter(l => l && l.id !== location.id);
   }, [storageLocations, location]);
 
   const [resolutionMode, setResolutionMode] = useState(otherLocations.length > 0 ? 'REASSIGN' : 'UNLINK'); // 'REASSIGN' | 'UNLINK'
@@ -50,15 +52,16 @@ export default function DeleteLocationModal({
         }
       }
 
-      await apiService.deleteStorageLocation(location.id, options, `${currentRole.name} (${currentRole.title})`);
+      const operatorName = currentRole ? `${currentRole.name || 'User'} (${currentRole.title || 'Staff'})` : 'User';
+      await apiService.deleteStorageLocation(location.id, options, operatorName);
 
       modalService.success(
         'ลบจุดจัดเก็บสำเร็จ',
         hasAssigned
           ? (resolutionMode === 'REASSIGN'
-              ? `ย้ายสินค้า ${assignedProducts.length} รายการ และลบจุดจัดเก็บ "${location.name}" เรียบร้อยแล้ว`
-              : `ปลดสินค้า ${assignedProducts.length} รายการ และลบจุดจัดเก็บ "${location.name}" เรียบร้อยแล้ว`)
-          : `ลบจุดจัดเก็บ "${location.name}" เรียบร้อยแล้ว`
+              ? `ย้ายสินค้า ${assignedProducts.length} รายการ และลบจุดจัดเก็บ "${location.name || '-'}" เรียบร้อยแล้ว`
+              : `ปลดสินค้า ${assignedProducts.length} รายการ และลบจุดจัดเก็บ "${location.name || '-'}" เรียบร้อยแล้ว`)
+          : `ลบจุดจัดเก็บ "${location.name || '-'}" เรียบร้อยแล้ว`
       );
 
       if (onDeleted) onDeleted(location.id);
@@ -85,7 +88,7 @@ export default function DeleteLocationModal({
                 ยืนยันการลบจุดจัดเก็บสินค้า
               </h3>
               <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
-                {location.name}
+                {location.name || '-'}
               </p>
             </div>
           </div>

@@ -31,19 +31,21 @@ export default function SearchableSelect({
 
   // Find currently selected option
   const selectedOption = useMemo(() => {
-    return options.find(opt => String(opt.value) === String(value));
+    return (options || []).find(opt => opt && String(opt.value) === String(value));
   }, [options, value]);
 
   // Filter options based on search term
   const filteredOptions = useMemo(() => {
-    if (!searchTerm.trim()) return options;
+    const list = Array.isArray(options) ? options.filter(Boolean) : [];
+    if (!searchTerm || !searchTerm.trim()) return list;
     const q = searchTerm.trim().toLowerCase();
-    return options.filter(opt => {
-      const matchLabel = opt.label?.toLowerCase().includes(q);
-      const matchSub = opt.subLabel?.toLowerCase().includes(q);
-      const matchCode = opt.code?.toLowerCase().includes(q);
-      const matchKeywords = opt.keywords?.toLowerCase().includes(q);
-      return matchLabel || matchSub || matchCode || matchKeywords;
+    return list.filter(opt => {
+      if (!opt) return false;
+      const matchLabel = opt.label?.toLowerCase()?.includes(q);
+      const matchSub = opt.subLabel?.toLowerCase()?.includes(q);
+      const matchCode = opt.code?.toLowerCase()?.includes(q);
+      const matchKeywords = opt.keywords?.toLowerCase()?.includes(q);
+      return Boolean(matchLabel || matchSub || matchCode || matchKeywords);
     });
   }, [options, searchTerm]);
 
@@ -289,6 +291,7 @@ export default function SearchableSelect({
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt, idx) => {
+                if (!opt) return null;
                 const isSelected = String(opt.value) === String(value);
                 const isHighlighted = idx === highlightedIndex;
                 const hasItemActions = (onEditOption || onDeleteOption) && opt.value !== '' && opt.value !== null && opt.value !== undefined;

@@ -7,8 +7,8 @@ import DeleteLocationModal from '../components/admin/DeleteLocationModal';
 import SignatureManagerSection from '../components/admin/SignatureManagerSection';
 import { storageService } from '../services/storageService';
 import { apiService } from '../services/apiService';
-import { authService } from '../services/authService';
 import { modalService } from '../services/modalService';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 
 
 export default function MasterDataView({
@@ -178,7 +178,7 @@ export default function MasterDataView({
     
     // Check if any product is assigned to this storage location
     const allProds = storageService.getProducts();
-    const assigned = allProds.filter(p => p.locationId === loc.id);
+    const assigned = (allProds || []).filter(p => p && p.locationId === loc.id);
     
     if (assigned.length > 0) {
       return modalService.warning(
@@ -415,7 +415,7 @@ export default function MasterDataView({
                       </td>
                       <td className="py-3.5 px-4">{deptBadge(p.category)}</td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
-                        ฿{p.price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ฿{(Number(p.price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-indigo-700 tabular-nums">
                         {p.stockBalance || 0} <span className="text-xs text-slate-400 font-sans">{p.unit}</span>
@@ -595,7 +595,7 @@ export default function MasterDataView({
                     </tr>
                   ) : (
                     filteredLocations.map((loc, idx) => {
-                      const assignedProducts = products.filter(p => p.locationId === loc.id);
+                      const assignedProducts = (products || []).filter(p => p && p.locationId === loc.id);
                       return (
                         <tr key={loc.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3.5 pl-6 font-mono font-bold text-slate-400 text-xs whitespace-nowrap">
@@ -819,56 +819,64 @@ export default function MasterDataView({
 
       {/* Modals */}
       {showProdModal && (
-        <ProductCRUDModal
-          editProd={editProd}
-          product={editProd}
-          products={products}
-          vendors={vendors}
-          storageLocations={storageLocations}
-          currentRole={currentRole}
-          onClose={() => { setShowProdModal(false); setEditProd(null); }}
-          onRefresh={onRefresh}
-        />
+        <ErrorBoundary isModal={true} name="ProductCRUDModal" onClose={() => { setShowProdModal(false); setEditProd(null); }}>
+          <ProductCRUDModal
+            editProd={editProd}
+            product={editProd}
+            products={products}
+            vendors={vendors}
+            storageLocations={storageLocations}
+            currentRole={currentRole}
+            onClose={() => { setShowProdModal(false); setEditProd(null); }}
+            onRefresh={onRefresh}
+          />
+        </ErrorBoundary>
       )}
 
       {showVendorModal && (
-        <VendorCRUDModal
-          editVendor={editVendor}
-          vendor={editVendor}
-          vendors={vendors}
-          currentRole={currentRole}
-          onClose={() => { setShowVendorModal(false); setEditVendor(null); }}
-          onRefresh={onRefresh}
-        />
+        <ErrorBoundary isModal={true} name="VendorCRUDModal" onClose={() => { setShowVendorModal(false); setEditVendor(null); }}>
+          <VendorCRUDModal
+            editVendor={editVendor}
+            vendor={editVendor}
+            vendors={vendors}
+            currentRole={currentRole}
+            onClose={() => { setShowVendorModal(false); setEditVendor(null); }}
+            onRefresh={onRefresh}
+          />
+        </ErrorBoundary>
       )}
 
       {showLocationModal && (
-        <StorageLocationCRUDModal
-          editLocation={editLocation}
-          location={editLocation}
-          storageLocations={storageLocations}
-          currentRole={currentRole}
-          onClose={() => { setShowLocationModal(false); setEditLocation(null); }}
-          onSaved={() => {
-            if (onRefresh) onRefresh();
-          }}
-          onCreated={() => {
-            if (onRefresh) onRefresh();
-          }}
-        />
+        <ErrorBoundary isModal={true} name="StorageLocationCRUDModal" onClose={() => { setShowLocationModal(false); setEditLocation(null); }}>
+          <StorageLocationCRUDModal
+            editLocation={editLocation}
+            location={editLocation}
+            storageLocations={storageLocations}
+            currentRole={currentRole}
+            onClose={() => { setShowLocationModal(false); setEditLocation(null); }}
+            onSaved={() => {
+              if (onRefresh) onRefresh();
+            }}
+            onCreated={() => {
+              if (onRefresh) onRefresh();
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {deleteLocationItem && (
-        <DeleteLocationModal
-          location={deleteLocationItem}
-          products={products}
-          storageLocations={storageLocations}
-          currentRole={currentRole}
-          onClose={() => setDeleteLocationItem(null)}
-          onDeleted={() => {
-            if (onRefresh) onRefresh();
-          }}
-        />
+        <ErrorBoundary isModal={true} name="DeleteLocationModal" onClose={() => setDeleteLocationItem(null)}>
+          <DeleteLocationModal
+            location={deleteLocationItem}
+            products={products}
+            storageLocations={storageLocations}
+            currentRole={currentRole}
+            onClose={() => setDeleteLocationItem(null)}
+            onDeleted={() => {
+              if (onRefresh) onRefresh();
+            }}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

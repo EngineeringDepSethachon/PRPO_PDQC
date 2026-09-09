@@ -10,19 +10,20 @@ import {
 
 export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, vendors = [], currentRole, onClose, onRefresh }) {
   const editVendor = propEditVendor || vendor;
-  const isSupervisor = !currentRole.canViewAllDepts;
-  const lockedDept = isSupervisor ? currentRole.department : null;
+  const isSupervisor = !currentRole?.canViewAllDepts;
+  const lockedDept = isSupervisor ? currentRole?.department : null;
   const [vendorCode, setVendorCode] = useState(editVendor?.code || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const allVendors = useMemo(() => {
-    return vendors.length > 0 ? vendors : storageService.getVendors();
+    const list = vendors && vendors.length > 0 ? vendors : storageService.getVendors();
+    return Array.isArray(list) ? list.filter(Boolean) : [];
   }, [vendors]);
 
   const isCodeDuplicate = useMemo(() => {
-    const cleanCode = vendorCode.trim().toUpperCase();
+    const cleanCode = (vendorCode || '').trim().toUpperCase();
     if (!cleanCode) return false;
-    return allVendors.some(v => v.id !== editVendor?.id && (v.code || '').trim().toUpperCase() === cleanCode);
+    return allVendors.some(v => v && v.id !== editVendor?.id && (v.code || '').trim().toUpperCase() === cleanCode);
   }, [vendorCode, allVendors, editVendor]);
 
   const handleSaveVendor = async (e) => {
@@ -48,7 +49,7 @@ export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, ve
       await apiService.saveVendor(vendorObj);
       modalService.success('บันทึกผู้ขายเรียบร้อย', `บันทึกข้อมูลผู้ขาย "${vendorObj.name}" สำเร็จ`);
       onClose();
-      onRefresh();
+      if (onRefresh) onRefresh();
     } catch (err) {
       modalService.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล', err.message);
     } finally {
@@ -78,7 +79,7 @@ export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, ve
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
-                {editVendor ? `รหัสคู่ค้า: ${editVendor.code} • ${editVendor.name}` : 'กำหนดข้อมูลรายละเอียดคู่ค้า ผู้ติดต่อ และที่อยู่สำหรับออก PO'}
+                {editVendor ? `รหัสคู่ค้า: ${editVendor.code || '-'} • ${editVendor.name || '-'}` : 'กำหนดข้อมูลรายละเอียดคู่ค้า ผู้ติดต่อ และที่อยู่สำหรับออก PO'}
               </p>
             </div>
           </div>

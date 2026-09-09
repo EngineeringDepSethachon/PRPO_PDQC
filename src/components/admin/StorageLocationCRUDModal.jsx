@@ -5,41 +5,46 @@ import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
 
 export default function StorageLocationCRUDModal({
-  location = null,
+  editLocation: propEditLocation,
+  location: propLocation,
   storageLocations = [],
   currentRole,
   onClose,
   onSaved,
   onCreated
 }) {
+  const location = propEditLocation || propLocation || null;
   const isEdit = Boolean(location && location.id);
 
   const [name, setName] = useState(location?.name || '');
   const [department, setDepartment] = useState(
-    location?.department || (currentRole.canViewAllDepts ? 'ALL' : currentRole.department)
+    location?.department || (currentRole?.canViewAllDepts ? 'ALL' : currentRole?.department || 'ALL')
   );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Duplicate name check (case-insensitive)
+  // Duplicate name check (case-insensitive, fully guarded against nulls and undefined)
   const isNameDuplicate = Boolean(
-    name.trim() &&
-    storageLocations.some(
-      l => l.id !== location?.id && l.name.trim().toLowerCase() === name.trim().toLowerCase()
-    )
+    name?.trim() &&
+    (Array.isArray(storageLocations) ? storageLocations : [])
+      .filter(Boolean)
+      .some(
+        l => l && l.id !== location?.id && (l.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+      )
   );
 
   const handleSave = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) {
+    const cleanName = (name || '').trim();
+    if (!cleanName) {
       setError('กรุณาระบุชื่อจุดจัดเก็บสินค้า');
       return;
     }
 
     if (isNameDuplicate) {
-      setError(`ชื่อจุดจัดเก็บ "${name.trim()}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`);
+      setError(`ชื่อจุดจัดเก็บ "${cleanName}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`);
       return;
     }
 
@@ -47,11 +52,12 @@ export default function StorageLocationCRUDModal({
     try {
       const payload = {
         id: location?.id || undefined,
-        name: name.trim(),
-        department
+        name: cleanName,
+        department: department || 'ALL'
       };
 
-      const saved = await apiService.saveStorageLocation(payload, `${currentRole.name} (${currentRole.title})`);
+      const operatorName = currentRole ? `${currentRole.name || 'User'} (${currentRole.title || 'Staff'})` : 'User';
+      const saved = await apiService.saveStorageLocation(payload, operatorName);
 
       modalService.success(
         isEdit ? 'แก้ไขจุดจัดเก็บเรียบร้อย' : 'เพิ่มจุดจัดเก็บสำเร็จ',
@@ -192,7 +198,7 @@ export default function StorageLocationCRUDModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving || isNameDuplicate || !name.trim()}
+              disabled={isSaving || isNameDuplicate || !(name && name.trim())}
               className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check className="w-4 h-4" />

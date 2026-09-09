@@ -8,6 +8,7 @@ import LoginView from './components/auth/LoginView';
 import PRDetailsModal from './components/pr/PRDetailsModal';
 import PODetailsModal from './components/po/PODetailsModal';
 import FeedbackModal from './components/common/FeedbackModal';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 import DashboardView from './views/DashboardView';
 import MyWorkView from './views/MyWorkView';
@@ -298,14 +299,16 @@ export default function App() {
           )}
 
           {activeView === 'master-data' && (
-            <MasterDataView
-              products={products}
-              vendors={vendors}
-              storageLocations={storageLocations}
-              users={users}
-              currentRole={currentRole}
-              onRefresh={refreshData}
-            />
+            <ErrorBoundary name="MasterDataView">
+              <MasterDataView
+                products={products}
+                vendors={vendors}
+                storageLocations={storageLocations}
+                users={users}
+                currentRole={currentRole}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
           )}
 
           {activeView === 'online-tasks' && (

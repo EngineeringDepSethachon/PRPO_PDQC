@@ -15,9 +15,6 @@
     "gas:deploy": "npx --yes @google/clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d \"Redeploy_same_URL\"",
     "gas:update": "npx --yes @google/clasp push --force && npx --yes @google/clasp deploy -i AKfycbyqmS6l4LBLKpD4_5MN4SyohBuNu8KBEw3OH-YJa3sR_zk1sxtGiTYjNBxYxW3HgQgS -d \"Redeploy_same_URL\""
   },
-
-
-
   "dependencies": {
     "lucide-react": "^1.31.0",
     "react": "^19.2.8",
@@ -31,6 +28,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "autoprefixer": "^10.5.4",
+    "happy-dom": "^20.14.0",
     "oxlint": "^1.75.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
