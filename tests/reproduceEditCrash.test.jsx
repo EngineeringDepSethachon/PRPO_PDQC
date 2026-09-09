@@ -252,5 +252,66 @@ describe('Reproduce Edit Modal Crash', () => {
     });
     expect(document.body.innerHTML).toContain('แก้ไขจุดจัดเก็บสินค้า');
   });
+
+  it('handles NUMERIC location name, vendor code, and product code without (u || "").trim is not a function error', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    // Numeric values from Google Sheets (e.g., cell formatted as number)
+    const numericLocations = [
+      { id: 'L-NUM-1', name: 101, department: 'PD' },
+      { id: 'L-NUM-2', name: 202, department: 'ALL' }
+    ];
+
+    const numericVendors = [
+      { id: 'V-NUM-1', code: 9999, name: 'Vendor 9999', department: 'PD' }
+    ];
+
+    const numericProducts = [
+      { id: 'P-NUM-1', code: 12345, name: 'Product 12345', price: 50, stockBalance: 10, unit: 'ชิ้น', locationId: 'L-NUM-1' }
+    ];
+
+    await act(async () => {
+      root.render(
+        <MasterDataView
+          products={numericProducts}
+          vendors={numericVendors}
+          storageLocations={numericLocations}
+          users={[]}
+          currentRole={ROLES.REQUESTER_PD}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // 1. Edit Product with numeric code
+    const editProdBtn = document.querySelector('button[title="แก้ไขสินค้า"]');
+    expect(editProdBtn).not.toBeNull();
+    await act(async () => {
+      editProdBtn.click();
+    });
+    expect(document.body.innerHTML).toContain('แก้ไขข้อมูลสินค้า Master Data');
+
+    const closeBtn = document.querySelector('button[aria-label="Close modal"]');
+    if (closeBtn) {
+      await act(async () => {
+        closeBtn.click();
+      });
+    }
+
+    // 2. Edit Location with numeric name (101)
+    const locTabBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('จุดจัดเก็บสินค้า'));
+    await act(async () => {
+      locTabBtn.click();
+    });
+    const editLocBtn = document.querySelector('button[title="แก้ไขจุดจัดเก็บ"]');
+    expect(editLocBtn).not.toBeNull();
+    await act(async () => {
+      editLocBtn.click();
+    });
+    expect(document.body.innerHTML).toContain('แก้ไขจุดจัดเก็บสินค้า');
+    expect(document.body.innerHTML).not.toContain('(u || "").trim is not a function');
+  });
 });
 

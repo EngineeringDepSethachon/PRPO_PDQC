@@ -371,10 +371,10 @@ export const apiService = {
   async saveProduct(product, user = null) {
     const products = storageService.getProducts();
     const isUpdate = Boolean(product.id);
-    const targetCode = (product.code || '').trim().toUpperCase();
+    const targetCode = String(product.code || '').trim().toUpperCase();
 
     if (targetCode) {
-      const isDuplicate = products.some(p => p.id !== product.id && (p.code || '').trim().toUpperCase() === targetCode);
+      const isDuplicate = (products || []).some(p => p && p.id !== product.id && String(p.code || '').trim().toUpperCase() === targetCode);
       if (isDuplicate) {
         throw new Error(`รหัสสินค้า "${targetCode}" มีอยู่ในระบบแล้ว กรุณาระบุรหัสสินค้าอื่น`);
       }
@@ -413,10 +413,10 @@ export const apiService = {
   async saveVendor(vendor, user = null) {
     const vendors = storageService.getVendors();
     const isUpdate = Boolean(vendor.id);
-    const targetCode = (vendor.code || '').trim().toUpperCase();
+    const targetCode = String(vendor.code || '').trim().toUpperCase();
 
     if (targetCode) {
-      const isDuplicate = vendors.some(v => v.id !== vendor.id && (v.code || '').trim().toUpperCase() === targetCode);
+      const isDuplicate = (vendors || []).some(v => v && v.id !== vendor.id && String(v.code || '').trim().toUpperCase() === targetCode);
       if (isDuplicate) {
         throw new Error(`รหัสผู้ขาย "${targetCode}" มีอยู่ในระบบแล้ว กรุณาระบุรหัสผู้ขายอื่น`);
       }
@@ -451,10 +451,10 @@ export const apiService = {
   async saveStorageLocation(location, user = null) {
     const locations = storageService.getStorageLocations();
     const isUpdate = Boolean(location.id);
-    const targetName = (location.name || '').trim().toLowerCase();
+    const targetName = String(location.name || '').trim().toLowerCase();
 
     if (targetName) {
-      const isDuplicate = locations.some(l => l.id !== location.id && (l.name || '').trim().toLowerCase() === targetName);
+      const isDuplicate = (locations || []).some(l => l && l.id !== location.id && String(l.name || '').trim().toLowerCase() === targetName);
       if (isDuplicate) {
         throw new Error(`ชื่อจุดจัดเก็บ "${location.name}" มีอยู่ในระบบแล้ว กรุณาระบุชื่ออื่น`);
       }

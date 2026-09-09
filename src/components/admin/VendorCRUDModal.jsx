@@ -12,7 +12,7 @@ export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, ve
   const editVendor = propEditVendor || vendor;
   const isSupervisor = !currentRole?.canViewAllDepts;
   const lockedDept = isSupervisor ? currentRole?.department : null;
-  const [vendorCode, setVendorCode] = useState(editVendor?.code || '');
+  const [vendorCode, setVendorCode] = useState(editVendor?.code != null ? String(editVendor.code) : '');
   const [isSaving, setIsSaving] = useState(false);
 
   const allVendors = useMemo(() => {
@@ -21,9 +21,9 @@ export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, ve
   }, [vendors]);
 
   const isCodeDuplicate = useMemo(() => {
-    const cleanCode = (vendorCode || '').trim().toUpperCase();
+    const cleanCode = String(vendorCode || '').trim().toUpperCase();
     if (!cleanCode) return false;
-    return allVendors.some(v => v && v.id !== editVendor?.id && (v.code || '').trim().toUpperCase() === cleanCode);
+    return allVendors.some(v => v && v.id !== editVendor?.id && String(v.code || '').trim().toUpperCase() === cleanCode);
   }, [vendorCode, allVendors, editVendor]);
 
   const handleSaveVendor = async (e) => {
@@ -37,13 +37,13 @@ export default function VendorCRUDModal({ editVendor: propEditVendor, vendor, ve
       const formData = new FormData(e.target);
       const vendorObj = {
         id: editVendor?.id || '',
-        code: (formData.get('code') || vendorCode)?.trim().toUpperCase(),
-        name: formData.get('name')?.trim(),
-        contactPerson: formData.get('contactPerson')?.trim(),
-        phone: formData.get('phone')?.trim(),
-        taxId: formData.get('taxId')?.trim(),
-        department: lockedDept || formData.get('department'),
-        address: formData.get('address')?.trim()
+        code: String(formData.get('code') || vendorCode || '').trim().toUpperCase(),
+        name: String(formData.get('name') || '').trim(),
+        contactPerson: String(formData.get('contactPerson') || '').trim(),
+        phone: String(formData.get('phone') || '').trim(),
+        taxId: String(formData.get('taxId') || '').trim(),
+        department: lockedDept || formData.get('department') || 'BOTH',
+        address: String(formData.get('address') || '').trim()
       };
 
       await apiService.saveVendor(vendorObj);

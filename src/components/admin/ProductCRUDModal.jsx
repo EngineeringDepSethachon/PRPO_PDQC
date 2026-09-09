@@ -29,10 +29,10 @@ export default function ProductCRUDModal({
   const isSupervisor = !currentRole?.canViewAllDepts;
   const lockedCategory = isSupervisor ? currentRole?.department : null;
 
-  const [itemCode, setItemCode] = useState(editProd?.code || '');
-  const [category, setCategory] = useState(editProd?.category || lockedCategory || 'PD');
-  const [purchaseUnit, setPurchaseUnit] = useState(editProd?.purchaseUnit || editProd?.unit || 'ชิ้น');
-  const [stockUnit, setStockUnit] = useState(editProd?.stockUnit || editProd?.unit || 'ชิ้น');
+  const [itemCode, setItemCode] = useState(editProd?.code != null ? String(editProd.code) : '');
+  const [category, setCategory] = useState(editProd?.category ? String(editProd.category) : lockedCategory || 'PD');
+  const [purchaseUnit, setPurchaseUnit] = useState(editProd?.purchaseUnit || editProd?.unit ? String(editProd.purchaseUnit || editProd.unit) : 'ชิ้น');
+  const [stockUnit, setStockUnit] = useState(editProd?.stockUnit || editProd?.unit ? String(editProd.stockUnit || editProd.unit) : 'ชิ้น');
   const [conversionRate, setConversionRate] = useState(editProd?.conversionRate ?? 1);
   const [selectedSupplierId, setSelectedSupplierId] = useState(editProd?.supplierId || '');
   const [selectedLocationId, setSelectedLocationId] = useState(editProd?.locationId || '');
@@ -50,16 +50,16 @@ export default function ProductCRUDModal({
     setLocsList(Array.isArray(list) ? list.filter(Boolean) : []);
   }, [storageLocations]);
 
-  // Duplicate Item Code Check (Case-insensitive + trimmed)
+  // Duplicate Item Code Check (Case-insensitive + trimmed, fully guarded against numbers/nulls)
   const allProducts = useMemo(() => {
     const list = products && products.length > 0 ? products : storageService.getProducts();
     return Array.isArray(list) ? list.filter(Boolean) : [];
   }, [products]);
 
   const isCodeDuplicate = useMemo(() => {
-    const cleanCode = (itemCode || '').trim().toUpperCase();
+    const cleanCode = String(itemCode || '').trim().toUpperCase();
     if (!cleanCode) return false;
-    return allProducts.some(p => p && p.id !== editProd?.id && (p.code || '').trim().toUpperCase() === cleanCode);
+    return allProducts.some(p => p && p.id !== editProd?.id && String(p.code || '').trim().toUpperCase() === cleanCode);
   }, [itemCode, allProducts, editProd]);
 
   // Filter vendors visible to this role
@@ -77,11 +77,11 @@ export default function ProductCRUDModal({
       { value: '', label: '-- ไม่ระบุผู้ขายหลัก (จัดซื้อจะเลือกในใบขอซื้อ PR) --', subLabel: 'ปล่อยว่างไว้เพื่อให้ฝ่ายจัดซื้อเสนอราคา' },
       ...visibleVendors.map(v => ({
         value: v.id || '',
-        label: v.name || v.code || 'ไม่ระบุชื่อ',
-        code: v.code || '',
+        label: String(v.name || v.code || 'ไม่ระบุชื่อ'),
+        code: String(v.code || ''),
         subLabel: `ผู้ติดต่อ: ${v.contactPerson || '-'} • โทร: ${v.phone || '-'}`,
         badge: v.department === 'BOTH' ? 'ใช้ร่วมกัน' : `เฉพาะ ${v.department || '-'}`,
-        keywords: `${v.code || ''} ${v.name || ''} ${v.contactPerson || ''} ${v.phone || ''}`
+        keywords: `${String(v.code || '')} ${String(v.name || '')} ${String(v.contactPerson || '')} ${String(v.phone || '')}`
       }))
     ];
   }, [visibleVendors]);
@@ -96,9 +96,9 @@ export default function ProductCRUDModal({
       { value: '', label: '-- ยังไม่ระบุจุดจัดเก็บสินค้า --', subLabel: 'สามารถเลือกหรือระบุภายหลังได้' },
       ...filtered.map(l => ({
         value: l.id || '',
-        label: l.name || 'ไม่ระบุชื่อจุดเก็บ',
+        label: String(l.name || 'ไม่ระบุชื่อจุดเก็บ'),
         badge: l.department === 'ALL' ? 'ส่วนกลาง' : (l.department === 'PD' ? 'ฝ่ายผลิต' : 'ฝ่าย QC'),
-        keywords: `${l.name || ''} ${l.department || ''}`
+        keywords: `${String(l.name || '')} ${String(l.department || '')}`
       }))
     ];
   }, [locsList, lockedCategory, category]);
@@ -112,15 +112,15 @@ export default function ProductCRUDModal({
     setIsSaving(true);
     try {
       const formData = new FormData(e.target);
-      const pUnit = formData.get('purchaseUnit')?.trim() || purchaseUnit || 'ชิ้น';
-      const sUnit = formData.get('stockUnit')?.trim() || stockUnit || 'ชิ้น';
+      const pUnit = String(formData.get('purchaseUnit') || purchaseUnit || 'ชิ้น').trim();
+      const sUnit = String(formData.get('stockUnit') || stockUnit || 'ชิ้น').trim();
       const convRate = Number(formData.get('conversionRate')) || Number(conversionRate) || 1;
-      const selectedLoc = (Array.isArray(locsList) ? locsList : []).find(l => l && l.id === selectedLocationId);
+      const selectedLoc = (Array.isArray(locsList) ? locsList : []).find(l => l && String(l.id) === String(selectedLocationId));
 
       const prodObj = {
         id: editProd?.id || '',
-        code: (formData.get('code') || itemCode)?.trim().toUpperCase(),
-        name: formData.get('name')?.trim(),
+        code: String(formData.get('code') || itemCode || '').trim().toUpperCase(),
+        name: String(formData.get('name') || '').trim(),
         category: lockedCategory || category || formData.get('category'),
         purchaseUnit: pUnit,
         stockUnit: sUnit,

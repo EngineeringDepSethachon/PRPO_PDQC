@@ -16,20 +16,20 @@ export default function StorageLocationCRUDModal({
   const location = propEditLocation || propLocation || null;
   const isEdit = Boolean(location && location.id);
 
-  const [name, setName] = useState(location?.name || '');
+  const [name, setName] = useState(location?.name != null ? String(location.name) : '');
   const [department, setDepartment] = useState(
     location?.department || (currentRole?.canViewAllDepts ? 'ALL' : currentRole?.department || 'ALL')
   );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Duplicate name check (case-insensitive, fully guarded against nulls and undefined)
+  // Duplicate name check (case-insensitive, fully guarded against numbers, nulls, and undefined)
   const isNameDuplicate = Boolean(
-    name?.trim() &&
+    String(name || '').trim() &&
     (Array.isArray(storageLocations) ? storageLocations : [])
       .filter(Boolean)
       .some(
-        l => l && l.id !== location?.id && (l.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+        l => l && l.id !== location?.id && String(l.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase()
       )
   );
 
@@ -37,7 +37,7 @@ export default function StorageLocationCRUDModal({
     e.preventDefault();
     setError('');
 
-    const cleanName = (name || '').trim();
+    const cleanName = String(name || '').trim();
     if (!cleanName) {
       setError('กรุณาระบุชื่อจุดจัดเก็บสินค้า');
       return;
@@ -198,7 +198,7 @@ export default function StorageLocationCRUDModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving || isNameDuplicate || !(name && name.trim())}
+              disabled={isSaving || isNameDuplicate || !String(name || '').trim()}
               className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check className="w-4 h-4" />
