@@ -3,7 +3,7 @@ import { apiService } from '../services/apiService';
 import { 
   FileText, ArrowLeft, Info, AlertTriangle, FileSignature, 
   Plus, Trash2, Building2, Calendar, ShoppingBag, Globe, 
-  Sparkles, CheckCircle2, ShoppingCart, SlidersHorizontal, Repeat, ArrowRight, Factory, Building, Receipt, Package, HelpCircle, Layers, Paperclip
+  Sparkles, CheckCircle2, ShoppingCart, SlidersHorizontal, Repeat, ArrowRight, Factory, Building, Receipt, Package, HelpCircle, Layers, Paperclip, Loader2
 } from 'lucide-react';
 import { PR_SOURCE, PURCHASE_CHANNEL, MEMO_THRESHOLD, DEPARTMENTS } from '../config/constants';
 import FileUploader from '../components/common/FileUploader';
@@ -30,6 +30,7 @@ export default function PRCreateView({
   const [department, setDepartment] = useState(initialDept);
   const [source, setSource] = useState(editingPR?.source || 'FACTORY');
   const [purchaseChannel, setPurchaseChannel] = useState(editingPR?.purchaseChannel || 'SELF');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // File attachments
   const [onlineLink, setOnlineLink] = useState(editingPR?.specUrl || '');
@@ -370,6 +371,7 @@ export default function PRCreateView({
 
   const handleCreateSubmit = async (e, isDraft) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     // Validations
     if (!isDraft) {
@@ -399,6 +401,7 @@ export default function PRCreateView({
       }
     }
 
+    setIsSubmitting(true);
     try {
       const itemsFormatted = prItems.map(item => {
         const itemSource = item.source === 'OFFICE' ? 'OFFICE' : 'FACTORY';
@@ -550,6 +553,8 @@ export default function PRCreateView({
       onNavigate('pr-list');
     } catch (err) {
       modalService.error(editingPR ? 'เกิดข้อผิดพลาดในการแก้ไข PR' : 'เกิดข้อผิดพลาดในการสร้าง PR', err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1613,18 +1618,33 @@ export default function PRCreateView({
             <div className="flex items-center gap-3 ml-auto">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={(e) => handleCreateSubmit(e, true)}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-all shadow-xs hover:shadow cursor-pointer"
+                className={`px-5 py-2.5 text-xs sm:text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-all shadow-xs hover:shadow ${
+                  isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+                }`}
               >
-                {editingPR ? 'บันทึกแบบร่าง (Save Draft)' : 'บันทึกแบบร่าง (Draft)'}
+                {isSubmitting ? 'กำลังบันทึก...' : (editingPR ? 'บันทึกแบบร่าง (Save Draft)' : 'บันทึกแบบร่าง (Draft)')}
               </button>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={(e) => handleCreateSubmit(e, false)}
-                className="px-7 py-2.5 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+                className={`px-7 py-2.5 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 ${
+                  isSubmitting ? 'opacity-75 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+                }`}
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{editingPR ? 'บันทึกและส่งใบ PR ใหม่ (Resubmit)' : 'ส่งใบ PR เข้าสู่ระบบ'}</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>กำลังส่งข้อมูล PR...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{editingPR ? 'บันทึกและส่งใบ PR ใหม่ (Resubmit)' : 'ส่งใบ PR เข้าสู่ระบบ'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

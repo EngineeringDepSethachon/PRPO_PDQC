@@ -163,28 +163,64 @@ export const workflowEngine = {
     const userLevel = Number(currentRole?.level || 1);
     const isAdmin = currentRole?.id === 'ADMIN' || currentRole?.roleId === 'ADMIN' || userLevel >= 99;
     const isOnlinePurchaser = currentRole?.roleId === 'ONLINE_PURCHASER' || currentRole?.id === 'ONLINE_PURCHASER' || currentRole?.positionKey === 'ONLINE_PURCHASER' || (currentRole?.canOnlinePurchase && userLevel < 99);
-    const isPlantMgr = userLevel >= 3 || currentRole?.canFinalApprove;
-    const isAsstMgr = userLevel === 2 && !isOnlinePurchaser;
+    const isPlantMgr = (userLevel >= 3 || currentRole?.canFinalApprove || currentRole?.roleId === 'PLANT_MANAGER' || currentRole?.positionKey === 'APPROVER') && !isAdmin;
+    const isAsstMgr = (userLevel === 2 || currentRole?.canReview || currentRole?.roleId === 'ASST_MANAGER' || currentRole?.positionKey === 'REVIEWER') && !isOnlinePurchaser && !isPlantMgr && !isAdmin;
+
+    const normalizeStr = (str) => (str || '').trim().toLowerCase();
+    const stripParen = (str) => normalizeStr(str).replace(/\s*\([^)]*\)/g, '').trim();
+
+    const roleNames = [
+      currentRole?.name,
+      currentRole?.employeeName,
+      currentRole?.displayName,
+      currentRole?.username,
+      currentRole?.employeeId,
+      currentRole?.id
+    ].filter(Boolean);
+
+    const matchesUser = (targetName) => {
+      if (!targetName) return false;
+      const cleanTarget = normalizeStr(targetName);
+      const baseTarget = stripParen(cleanTarget);
+      return roleNames.some(rn => {
+        const cleanRole = normalizeStr(rn);
+        const baseRole = stripParen(cleanRole);
+        return cleanRole === cleanTarget ||
+               cleanRole.includes(cleanTarget) ||
+               cleanTarget.includes(cleanRole) ||
+               (baseRole && baseTarget && (baseRole === baseTarget || baseRole.includes(baseTarget) || baseTarget.includes(baseRole)));
+      });
+    };
 
     const hasDirectlyActedOn = (doc) => {
       if (!doc || !currentRole) return false;
-      const names = [currentRole.name, currentRole.employeeName, currentRole.displayName, currentRole.username].filter(Boolean);
+      if (matchesUser(doc.requestedBy) || matchesUser(doc.applicantName1) || matchesUser(doc.creator)) return true;
 
-      if (names.includes(doc.requestedBy) || names.includes(doc.applicantName1)) return true;
-
-      if (doc.activityLog?.some(log =>
-        names.includes(log.user) ||
-        (currentRole.title && log.role === currentRole.title)
+      if (Array.isArray(doc.activityLog) && doc.activityLog.some(log =>
+        matchesUser(log.user) ||
+        (currentRole.title && normalizeStr(log.role) === normalizeStr(currentRole.title))
       )) return true;
 
       return false;
     };
 
-    const waitingStatusesFor = {
-      plantMgr: [],
-      asstMgr: ['REVIEWED'],
-      requester: ['SUBMITTED', 'REJECTED_TO_L2', 'REVIEWED'],
-      onlinePurchaser: ['ORDERED_PENDING_DELIVERY', 'IN_DELIVERY', 'PARTIAL'],
+    // Check if the current user personally performed a review on this document
+    const hasReviewedDoc = (doc) => {
+      if (!doc || !Array.isArray(doc.activityLog)) return false;
+      return doc.activityLog.some(log => {
+        const actionStr = normalizeStr(log.action);
+        const isReviewAction = actionStr.includes('ตรวจ') || actionStr.includes('review') || actionStr.includes('level 1') || actionStr.includes('asst mgr');
+        return isReviewAction && (matchesUser(log.user) || (currentRole.title && normalizeStr(log.role) === normalizeStr(currentRole.title)));
+      });
+    };
+
+    const isDocCreator = (doc) => {
+      if (!doc) return false;
+      return matchesUser(doc.requestedBy) || matchesUser(doc.applicantName1) || matchesUser(doc.creator);
+    };
+
+    const isDeptMatch = (dept) => {
+      return currentRole?.department === 'ALL' || currentRole?.department === dept || isAdmin;
     };
 
     let prActionCount = 0;
@@ -194,21 +230,57 @@ export const workflowEngine = {
     // 1. Process PRs
     prs.forEach(pr => {
       const isDone = ['PO_ISSUED', 'APPROVED', 'CLOSED', 'CANCELLED'].includes(pr.status);
-      const canAction = !isDone && this.canAction(currentRole, pr);
-      const actedOn = hasDirectlyActedOn(pr);
+      const userActed = hasDirectlyActedOn(pr);
+      const userCreated = isDocCreator(pr);
+      const userReviewed = hasReviewedDoc(pr);
+      const isDeptMember = isDeptMatch(pr.department);
 
+      let canAction = false;
       let isWaiting = false;
-      if (!canAction && !isDone) {
-        if (isAdmin) {
-          isWaiting = true;
-        } else if (isPlantMgr) {
-          isWaiting = false;
-        } else if (isAsstMgr) {
-          isWaiting = actedOn && waitingStatusesFor.asstMgr.includes(pr.status);
-        } else if (isOnlinePurchaser) {
-          isWaiting = false;
-        } else {
-          isWaiting = actedOn && waitingStatusesFor.requester.includes(pr.status);
+
+      if (!isDone) {
+        if (pr.status === 'DRAFT' || pr.status === 'REJECTED_TO_DRAFT') {
+          // Task belongs to creator/requester to edit & submit
+          if (userCreated || (!pr.requestedBy && isDeptMember && userLevel === 1)) {
+            canAction = true;
+          }
+        } else if (pr.status === 'SUBMITTED' || pr.status === 'REJECTED_TO_L2') {
+          // Task belongs to Level 2 Reviewer (Assistant Manager)
+          if (userCreated) {
+            // Requester submitted it -> waiting for Level 2 review
+            isWaiting = true;
+          } else if (isAsstMgr && isDeptMember) {
+            canAction = true;
+          } else if (isAdmin) {
+            // Admin can act as reviewer (unless Admin created it as requester)
+            canAction = true;
+          } else if (isPlantMgr) {
+            // Plant Mgr is waiting for Level 2 review
+            isWaiting = userActed || isDeptMember;
+          } else {
+            isWaiting = userActed;
+          }
+        } else if (pr.status === 'REVIEWED') {
+          // Task belongs to Level 3 Approver (Plant Manager)
+          if (userReviewed) {
+            // User already reviewed this PR -> task completed! Waiting for Plant Mgr!
+            isWaiting = true;
+          } else if (isAsstMgr) {
+            // For Level 2 Asst Mgr: review is done -> waiting for Plant Mgr!
+            isWaiting = userActed || isDeptMember;
+          } else if (userCreated) {
+            // Requester is waiting for Plant Mgr approval
+            isWaiting = true;
+          } else if (isPlantMgr && isDeptMember) {
+            // Plant Mgr approver must approve!
+            canAction = true;
+          } else if (isAdmin) {
+            // For Admin: if Admin already reviewed it, it's waiting (handled in userReviewed)
+            // If Admin didn't review it, Admin can action as Plant Mgr approver
+            canAction = true;
+          } else {
+            isWaiting = userActed;
+          }
         }
       }
 
@@ -229,7 +301,7 @@ export const workflowEngine = {
         prActionCount++;
       } else if (isWaiting) {
         waiting.push(taskItem);
-      } else if (isDone && actedOn) {
+      } else if (isDone && (userActed || userCreated || (isAdmin && isDeptMember))) {
         completed.push(taskItem);
       }
     });
@@ -238,7 +310,7 @@ export const workflowEngine = {
     const isLinkedToOwnPR = (po) => {
       if (!po.prId && !po.prNo) return false;
       return prs.some(pr =>
-        (pr.id === po.prId || pr.prNo === po.prNo) && hasDirectlyActedOn(pr)
+        (pr.id === po.prId || pr.prNo === po.prNo) && (hasDirectlyActedOn(pr) || isDocCreator(pr))
       );
     };
 
@@ -246,33 +318,49 @@ export const workflowEngine = {
     pos.forEach(po => {
       const isClaim = ['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS'].includes(po.status);
       const isDone = po.status === 'CLOSED' || po.status === 'CANCELLED' || po.status === 'RECEIVED';
-      const canAction = !isDone && this.canAction(currentRole, po);
-      const actedOnPO = hasDirectlyActedOn(po);
-      const isOwnerOfPO = actedOnPO || isLinkedToOwnPR(po);
+      const userActedPO = hasDirectlyActedOn(po);
+      const isOwnerOfPO = userActedPO || isLinkedToOwnPR(po) || isDocCreator(po);
+      const isDeptMember = isDeptMatch(po.department);
 
+      let canAction = false;
       let isWaiting = false;
-      if (!canAction && !isDone && !isClaim) {
-        if (isAdmin) {
-          isWaiting = true;
-        } else if (isOnlinePurchaser) {
-          isWaiting = actedOnPO && waitingStatusesFor.onlinePurchaser.includes(po.status);
-        } else if (isPlantMgr || isAsstMgr) {
-          isWaiting = false;
-        } else {
-          const isDeptMember = currentRole?.department === 'ALL' || currentRole?.department === po.department;
-          isWaiting = (isOwnerOfPO || isDeptMember) && po.status === 'IN_PROGRESS_ONLINE';
-        }
-      }
 
-      let isClaimAction = false;
-      if (isClaim && !isDone) {
-        if (isAdmin) {
-          isClaimAction = true;
-        } else if (po.purchaseChannel === 'SELF') {
-          const isDeptMember = currentRole?.department === 'ALL' || currentRole?.department === po.department;
-          isClaimAction = (isOwnerOfPO || isDeptMember) && !isOnlinePurchaser;
-        } else if (po.purchaseChannel === 'ONLINE' && isOnlinePurchaser) {
-          isClaimAction = true;
+      if (!isDone) {
+        if (isClaim) {
+          if (po.purchaseChannel === 'ONLINE') {
+            if (isOnlinePurchaser || isAdmin) canAction = true;
+            else if (isOwnerOfPO || isDeptMember) isWaiting = true;
+          } else {
+            // SELF Claim
+            if ((isOwnerOfPO || isDeptMember) && userLevel === 1) canAction = true;
+            else isWaiting = true;
+          }
+        } else if (po.status === 'IN_PROGRESS_ONLINE') {
+          // Task belongs to Online Purchaser
+          if (isOnlinePurchaser) {
+            canAction = true;
+          } else if (isAdmin) {
+            if (userActedPO) isWaiting = true;
+            else canAction = true;
+          } else if (isOwnerOfPO || isDeptMember || isPlantMgr || isAsstMgr) {
+            isWaiting = true;
+          }
+        } else if (['ORDERED_PENDING_DELIVERY', 'ISSUED', 'PARTIAL', 'IN_DELIVERY'].includes(po.status)) {
+          // Goods receiving task: ONLY Level 1 Requester of that department
+          if (userLevel === 1 && isDeptMember) {
+            canAction = true;
+          } else if (isOnlinePurchaser) {
+            // Online Purchaser already ordered -> waiting for delivery & receiver!
+            isWaiting = true;
+          } else if (isAsstMgr || isPlantMgr) {
+            // Management approved it -> waiting for delivery & receiving!
+            isWaiting = userActedPO || isDeptMember;
+          } else if (isAdmin) {
+            // For Admin: receiving goods is department warehouse task -> waiting
+            isWaiting = true;
+          } else if (isOwnerOfPO || isDeptMember) {
+            isWaiting = true;
+          }
         }
       }
 
@@ -315,19 +403,14 @@ export const workflowEngine = {
       if (canAction) {
         actionRequired.push(taskItem);
         if (!isOnlinePurchaser) poActionCount++;
-      } else if (isClaimAction) {
-        if (!isOnlinePurchaser) {
-          actionRequired.push({ ...taskItem, isClaim: true });
-          poActionCount++;
-        }
       } else if (isWaiting) {
         waiting.push(taskItem);
-      } else if (isDone && isOwnerOfPO) {
+      } else if (isDone && (isOwnerOfPO || (isAdmin && isDeptMember))) {
         completed.push(taskItem);
       }
     });
 
-    const sortByDate = (a, b) => new Date(b.date) - new Date(a.date);
+    const sortByDate = (a, b) => new Date(b.date || 0) - new Date(a.date || 0);
 
     return {
       action: actionRequired.sort(sortByDate),

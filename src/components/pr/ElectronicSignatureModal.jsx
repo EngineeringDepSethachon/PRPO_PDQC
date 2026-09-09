@@ -1,9 +1,9 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { PenTool, ShieldCheck, X, AlertTriangle, Lock } from 'lucide-react';
+import { PenTool, ShieldCheck, X, AlertTriangle, Lock, Loader2 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
-export default function ElectronicSignatureModal({ isOpen, user, actionText, onConfirm, onCancel }) {
+export default function ElectronicSignatureModal({ isOpen, user, actionText, isSubmitting = false, onConfirm, onCancel }) {
   if (!isOpen) return null;
 
   const signatureData = storageService.getSignatureByRole(user);
@@ -31,8 +31,9 @@ export default function ElectronicSignatureModal({ isOpen, user, actionText, onC
 
           <button 
             type="button"
+            disabled={isSubmitting}
             onClick={onCancel}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40"
           >
             <X className="w-5 h-5" />
           </button>
@@ -92,8 +93,9 @@ export default function ElectronicSignatureModal({ isOpen, user, actionText, onC
         <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-2 sticky bottom-0 z-20">
           <button 
             type="button"
+            disabled={isSubmitting}
             onClick={onCancel}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
           >
             {hasSignature ? 'ยกเลิก' : 'ปิด'}
           </button>
@@ -101,11 +103,23 @@ export default function ElectronicSignatureModal({ isOpen, user, actionText, onC
           {hasSignature && (
             <button 
               type="button"
+              disabled={isSubmitting}
               onClick={onConfirm}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2"
+              className={`px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 ${
+                isSubmitting ? 'opacity-70 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+              }`}
             >
-              <PenTool className="w-4 h-4" />
-              <span>ยืนยันและลงนาม</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>กำลังดำเนินการ...</span>
+                </>
+              ) : (
+                <>
+                  <PenTool className="w-4 h-4" />
+                  <span>ยืนยันและลงนาม</span>
+                </>
+              )}
             </button>
           )}
         </div>

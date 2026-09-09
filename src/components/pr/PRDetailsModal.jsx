@@ -23,6 +23,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
   const [sigModalConfig, setSigModalConfig] = useState(null); // { actionText, nextStatus, isSubmit, isReject }
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [viewingAttachment, setViewingAttachment] = useState(null);
   
   // Approver Item Editing State
@@ -86,7 +87,8 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
   };
 
   const executeAction = async () => {
-    if (!sigModalConfig) return;
+    if (!sigModalConfig || isExecutingAction) return;
+    setIsExecutingAction(true);
     try {
       if (sigModalConfig.isReject) {
         await apiService.rejectPR(selectedPR.id, currentRole, actionNote);
@@ -101,6 +103,8 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
       onRefresh();
     } catch (err) {
       modalService.error('เกิดข้อผิดพลาด', err.message);
+    } finally {
+      setIsExecutingAction(false);
     }
   };
 
@@ -778,6 +782,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
         isOpen={!!sigModalConfig}
         user={currentRole}
         actionText={sigModalConfig?.actionText}
+        isSubmitting={isExecutingAction}
         onConfirm={executeAction}
         onCancel={() => setSigModalConfig(null)}
       />

@@ -215,5 +215,61 @@ describe('Scenario 2: PR Lifecycle & Workflow Transitions', () => {
     expect(Array.isArray(result2.activityLog)).toBe(true);
     expect(result2.activityLog.length).toBe(1);
   });
+
+  it('My Workspace: When Level 2 reviews PR, document moves to "waiting" tab, not "action" tab', async () => {
+    // 1. Create two PRs: one PD, one QC
+    const prPD = await workflowEngine.createPR({
+      department: 'PD',
+      items: [{ productId: 'P-1', qty: 2, price: 500, name: 'Item PD' }],
+      totalAmount: 1000
+    }, ROLES.REQUESTER_PD, false);
+
+    const prQC = await workflowEngine.createPR({
+      department: 'QC',
+      items: [{ productId: 'P-2', qty: 1, price: 800, name: 'Item QC' }],
+      totalAmount: 800
+    }, ROLES.REQUESTER_QC, false);
+
+    // Initial state: Both PRs are SUBMITTED
+    // For Asst Manager: both should be in "action" (To Do)
+    let tasksL2 = workflowEngine.getUserTasks(ROLES.ASST_MANAGER, [prPD, prQC], []);
+    expect(tasksL2.action.length).toBe(2);
+    expect(tasksL2.waiting.length).toBe(0);
+
+    // For Requester PD: prPD should be in "waiting" (รอผู้อื่นดำเนินการ), not in "action"
+    let tasksReq = workflowEngine.getUserTasks(ROLES.REQUESTER_PD, [prPD, prQC], []);
+    expect(tasksReq.action.length).toBe(0);
+    expect(tasksReq.waiting.some(t => t.id === prPD.id)).toBe(true);
+
+    // 2. Asst Manager reviews prPD -> status becomes REVIEWED
+    const { pr: reviewedPD } = await workflowEngine.updatePRStatus(prPD.id, 'REVIEWED', ROLES.ASST_MANAGER, 'ผ่านการตรวจสอบขั้นที่ 1');
+    expect(reviewedPD.status).toBe('REVIEWED');
+
+    // 3. Now Asst Manager checks My Workspace tasks again
+    tasksL2 = workflowEngine.getUserTasks(ROLES.ASST_MANAGER, [reviewedPD, prQC], []);
+    // prPD (REVIEWED) MUST move to "waiting" tab!
+    expect(tasksL2.waiting.some(t => t.id === reviewedPD.id)).toBe(true);
+    // prPD MUST NOT be in "action" tab!
+    expect(tasksL2.action.some(t => t.id === reviewedPD.id)).toBe(false);
+    // prQC (SUBMITTED) should still be in "action" tab!
+    expect(tasksL2.action.some(t => t.id === prQC.id)).toBe(true);
+    expect(tasksL2.action.length).toBe(1);
+
+    // 4. For Plant Manager (Level 3 Approver):
+    // reviewedPD should now be in "action" (To Do for Plant Mgr to approve)
+    const tasksL3 = workflowEngine.getUserTasks(ROLES.PLANT_MANAGER, [reviewedPD, prQC], []);
+    expect(tasksL3.action.some(t => t.id === reviewedPD.id)).toBe(true);
+    // prQC is SUBMITTED (Level 2 hasn't reviewed yet), so Plant Mgr has it in waiting
+    expect(tasksL3.action.some(t => t.id === prQC.id)).toBe(false);
+
+    // 5. For Admin who performed the review on reviewedPD:
+    // If Admin performed review on reviewedPD, reviewedPD should be in waiting for Admin too
+    const adminUser = { ...ROLES.ADMIN, name: ROLES.ASST_MANAGER.name };
+    const tasksAdmin = workflowEngine.getUserTasks(adminUser, [reviewedPD, prQC], []);
+    expect(tasksAdmin.waiting.some(t => t.id === reviewedPD.id)).toBe(true);
+    expect(tasksAdmin.action.some(t => t.id === reviewedPD.id)).toBe(false);
+    expect(tasksAdmin.action.some(t => t.id === prQC.id)).toBe(true);
+  });
 });
+
 
