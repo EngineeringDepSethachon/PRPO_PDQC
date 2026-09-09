@@ -3,6 +3,37 @@ import { PR_STATUS, PO_STATUS, DEPARTMENTS } from '../config/constants.js';
 import { notificationService } from './notificationService.js';
 import { auditService } from './auditService.js';
 
+const ensureArray = (arr) => {
+  if (Array.isArray(arr)) return arr;
+  if (typeof arr === 'string' && arr.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // fallback
+    }
+  }
+  return [];
+};
+
+const addActivityLog = (doc, entry) => {
+  if (!doc) return;
+  doc.activityLog = ensureArray(doc.activityLog);
+  doc.activityLog.push(entry);
+};
+
+const addNGItem = (po, item) => {
+  if (!po) return;
+  po.ngItems = ensureArray(po.ngItems);
+  po.ngItems.push(item);
+};
+
+const addClaimHistory = (po, entry) => {
+  if (!po) return;
+  po.claimHistory = ensureArray(po.claimHistory);
+  po.claimHistory.push(entry);
+};
+
 export const workflowEngine = {
   
   canActionPO(role, po) {
@@ -326,11 +357,14 @@ export const workflowEngine = {
     }
 
     const oldTotal = pr.totalAmount || 0;
-    const formattedItems = updatedItems.map(item => {
+    const formattedItems = (updatedItems || []).map(item => {
       const pQty = Number(item.purchaseQty ?? item.qty) || 1;
       const rate = Number(item.conversionRate) > 0 ? Number(item.conversionRate) : 1;
       const sQty = Number(item.stockQty) || (pQty * rate);
       const price = Number(item.price) || 0;
+      const discountPercent = parseFloat(item.discountPercent) || 0;
+      const discountAmount = parseFloat(item.discountAmount) || ((price * pQty) * (discountPercent / 100));
+      const rowTotal = Math.max(0, (price * pQty) - discountAmount);
       return {
         ...item,
         purchaseUnit: item.purchaseUnit || item.unit || 'ชิ้น',
@@ -340,24 +374,74 @@ export const workflowEngine = {
         stockQty: sQty,
         qty: pQty,
         price,
-        total: price * pQty
+        discountPercent,
+        discountAmount,
+        total: rowTotal
       };
     });
 
-    const newTotal = formattedItems.reduce((sum, it) => sum + it.total, 0);
+    let newTotal = formattedItems.reduce((sum, it) => sum + it.total, 0);
+
+    if (pr.financials) {
+      const subtotal = formattedItems.reduce((sum, it) => sum + (it.purchaseQty * it.price), 0);
+      const itemDiscountTotal = formattedItems.reduce((sum, it) => sum + (parseFloat(it.discountAmount) || 0), 0);
+      const netAfterItemDiscount = Math.max(0, subtotal - itemDiscountTotal);
+
+      const fin = pr.financials;
+      const combinedDiscountType = fin.combinedDiscountType || 'percent';
+      const combinedDiscountValue = parseFloat(fin.combinedDiscountValue) || 0;
+      const combinedDiscountAmount = combinedDiscountType === 'percent'
+        ? (netAfterItemDiscount * (combinedDiscountValue / 100))
+        : combinedDiscountValue;
+      const totalDiscount = itemDiscountTotal + combinedDiscountAmount;
+      const netAfterAllDiscount = Math.max(0, subtotal - totalDiscount);
+
+      const vatMode = fin.vatMode || 'NONE';
+      const vatBase = vatMode === 'BEFORE_DISCOUNT' ? subtotal : netAfterAllDiscount;
+      const vatAmount = vatMode === 'NONE' ? 0 : (parseFloat((vatBase * 0.07).toFixed(2)) || 0);
+      const roundingAdj = parseFloat(fin.roundingAdj) || 0;
+      const shippingCost = parseFloat(fin.shippingCost) || 0;
+
+      const grandTotal = vatMode === 'BEFORE_DISCOUNT'
+        ? parseFloat((subtotal + vatAmount - totalDiscount + roundingAdj + shippingCost).toFixed(2))
+        : parseFloat((netAfterAllDiscount + vatAmount + roundingAdj + shippingCost).toFixed(2));
+
+      pr.financials = {
+        ...fin,
+        subtotal,
+        itemDiscountTotal,
+        combinedDiscountAmount,
+        totalDiscount,
+        vatAmount,
+        grandTotal
+      };
+      newTotal = grandTotal;
+    }
+
     pr.items = formattedItems;
     pr.totalAmount = newTotal;
+    pr.updatedAt = new Date().toLocaleString('th-TH');
 
     const timestamp = new Date().toLocaleString('th-TH');
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: 'แก้ไขรายการสินค้า (Approver Item Edit)',
-      user: user.name,
-      role: user.title,
+      user: user?.name || user?.username || 'Approver',
+      role: user?.title || user?.role || 'Approver',
       timestamp,
       note: `ผู้อนุมัติแก้ไขรายการสินค้า (ยอดเดิม ฿${oldTotal.toLocaleString()} → ยอดใหม่ ฿${newTotal.toLocaleString()})${editReason ? ` เหตุผล: ${editReason}` : ''}`
     });
 
     storageService.savePRs(prs);
+
+    auditService.logAction({
+      action: 'PR_ITEMS_EDITED',
+      actor: user,
+      department: pr.department,
+      docNo: pr.prNo,
+      docType: 'PR',
+      details: `ผู้อนุมัติ Level ${user?.level || 2} แก้ไขรายการสินค้า PR ${pr.prNo} (ยอดเดิม ฿${oldTotal.toLocaleString()} → ยอดใหม่ ฿${newTotal.toLocaleString()})${editReason ? ` เหตุผล: ${editReason}` : ''}`
+    });
+
     return pr;
   },
 
@@ -380,10 +464,10 @@ export const workflowEngine = {
     let notiTitle = 'ใบขอซื้อ (PR) ถูกส่งกลับให้แก้ไข';
 
     pr.status = nextStatus;
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: actionLabel,
-      user: user.name,
-      role: user.title,
+      user: user?.name || user?.username || 'Approver',
+      role: user?.title || user?.role || 'Approver',
       timestamp,
       note: `เหตุผลการส่งกลับ: ${reason.trim()}`
     });
@@ -482,7 +566,7 @@ export const workflowEngine = {
       noteText += ` (หมายเหตุ: ${varianceNote.trim()})`;
     }
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'รับทราบและสั่งซื้อออนไลน์แล้ว (Online Order Placed)',
       user: user.name,
       role: user.title,
@@ -535,7 +619,7 @@ export const workflowEngine = {
     pr.status = 'CANCELLED';
     const timestamp = new Date().toLocaleString('th-TH');
 
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: 'ยกเลิกใบขอซื้อ (Cancelled PR)',
       user: user.name,
       role: user.title,
@@ -592,7 +676,7 @@ export const workflowEngine = {
     po.status = 'CANCELLED';
     const timestamp = new Date().toLocaleString('th-TH');
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'ยกเลิกใบสั่งซื้อ (Cancelled PO)',
       user: user.name,
       role: user.title,
@@ -616,7 +700,7 @@ export const workflowEngine = {
       const prs = storageService.getPRs();
       const parentPR = prs.find(p => p.id === po.prId || p.prNo === po.prNo);
       if (parentPR) {
-        parentPR.activityLog.push({
+        addActivityLog(parentPR, {
           action: 'ใบสั่งซื้ออ้างอิงถูกยกเลิก (Referenced PO Cancelled)',
           user: user.name,
           role: user.title,
@@ -1066,8 +1150,7 @@ export const workflowEngine = {
     pr.status = nextStatus;
     pr._pendingGasSync = true;
 
-    if (!Array.isArray(pr.activityLog)) pr.activityLog = [];
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: draftFlag ? 'แก้ไขและบันทึกแบบร่าง (Draft Updated)' : 'แก้ไขและส่งใบ PR ใหม่ (PR Resubmitted)',
       user: user.name,
       role: user.title,
@@ -1117,7 +1200,7 @@ export const workflowEngine = {
     }
 
     pr.status = 'SUBMITTED';
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: 'ส่งพิจารณา (Submit)',
       user: user.name,
       role: user.title,
@@ -1169,7 +1252,7 @@ export const workflowEngine = {
     if (nextStatus === 'REJECTED_TO_DRAFT') actionLabel = 'ไม่อนุมัติ / ตีกลับให้แก้ไข (Rejected to Draft)';
     if (nextStatus === 'CANCELLED') actionLabel = 'ยกเลิกเอกสาร (Cancelled)';
 
-    pr.activityLog.push({
+    addActivityLog(pr, {
       action: actionLabel,
       user: user.name,
       role: user.title,
@@ -1514,8 +1597,7 @@ export const workflowEngine = {
         poItem.defectReason = defectNote || reasonLabel;
         poItem.defectNote = defectNote || reasonLabel;
 
-        po.ngItems = po.ngItems || [];
-        po.ngItems.push({
+        addNGItem(po, {
           productId: poItem.productId,
           productCode: poItem.code,
           name: poItem.name,
@@ -1606,7 +1688,7 @@ export const workflowEngine = {
       if (problematicSummaryParts.length > 0) parts.push(`ส่งเรื่องเคลม: ${problematicSummaryParts.join(', ')}`);
       const summaryNote = parts.join(' | ') + (note ? ` (หมายเหตุ: ${note})` : '');
 
-      po.activityLog.push({
+      addActivityLog(po, {
         action: `[${channel} CLAIM] ตรวจรับสินค้าพร้อมแจ้งเคลม`,
         user: user.name,
         role: user.title,
@@ -1661,7 +1743,7 @@ export const workflowEngine = {
       if (receivedSummaryParts.length > 0) parts.push(`รับปกติ: ${receivedSummaryParts.join(', ')}`);
       const summaryNote = parts.length > 0 ? `${parts.join(' | ')}${note ? ` — ${note}` : ''}` : (note || 'รับสินค้าบางส่วน');
 
-      po.activityLog.push({
+      addActivityLog(po, {
         action: allFullyReceived ? 'รับสินค้าครบและปิด PO (Goods Received – Closed)' : 'รับสินค้าบางส่วน (Partial Receiving)',
         user: user.name,
         role: user.title,
@@ -1685,7 +1767,7 @@ export const workflowEngine = {
         const pr = prs.find(p => p.id === po.prId);
         if (pr) {
           pr.status = 'CLOSED';
-          pr.activityLog.push({
+          addActivityLog(pr, {
             action: 'ปิดเอกสาร (Closed)',
             user: user.name,
             role: user.title,
@@ -1764,7 +1846,7 @@ export const workflowEngine = {
 
     const noteMsg = `ปิด PO ก่อนกำหนด (ของไม่ครบ/ไม่รอของแล้ว): ${reason.trim()}${unfulfilledSummary ? ` [ยอดที่ยังไม่ได้รับ: ${unfulfilledSummary}]` : ''}`;
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'ปิด PO ก่อนกำหนด (Short-Close PO)',
       user: user.name,
       role: user.title,
@@ -1777,7 +1859,7 @@ export const workflowEngine = {
     if (po.prId) {
       const pr = prs.find(p => p.id === po.prId);
       if (pr) {
-        pr.activityLog.push({
+        addActivityLog(pr, {
           action: 'ใบสั่งซื้อถูกปิดก่อนกำหนด (PO Short-Closed)',
           user: user.name,
           role: user.title,
@@ -1834,7 +1916,7 @@ export const workflowEngine = {
     const pQty = item.purchaseQty ?? item.qty ?? 1;
     const variance = (oldPrice - item.actUnitPrice) * pQty; // Positive means saved money, negative means overspent
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'อัปเดตราคาจริง (Actual Price)',
       user: user.name,
       role: user.title,
@@ -1862,7 +1944,7 @@ export const workflowEngine = {
     po.vendorName = vendorName;
     const timestamp = new Date().toLocaleString('th-TH');
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'ระบุผู้ขาย (Assign Vendor)',
       user: user.name,
       role: user.title,
@@ -1893,7 +1975,7 @@ export const workflowEngine = {
     };
 
     // Channel-tagged audit log
-    po.activityLog.push({
+    addActivityLog(po, {
       action: channel === 'ONLINE'
         ? '[ONLINE CLAIM] แจ้งปัญหาสินค้าสั่งซื้อออนไลน์'
         : '[SELF-BUY CLAIM] แจ้งปัญหาสินค้าจัดซื้อทั่วไป',
@@ -1956,12 +2038,11 @@ export const workflowEngine = {
 
     const channel = po.purchaseChannel === 'ONLINE' ? 'ONLINE' : 'SELF-BUY';
     po.claimRound = (po.claimRound || 0) + 1;
-    po.claimHistory = po.claimHistory || [];
     
     const timestamp = new Date().toLocaleString('th-TH');
     
     // Save history entry
-    po.claimHistory.push({
+    addClaimHistory(po, {
       round: po.claimRound,
       reportData: po.claimData,
       resolution: resolution,
@@ -2059,7 +2140,7 @@ export const workflowEngine = {
       noteMsg = `[${channel} CLAIM RESOLVED] ดำเนินการ: CLOSE_NO_ACTION — ปิดเคสโดยไม่ดำเนินการต่อ | ${resolution.note} โดย ${user.name}`;
     }
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: actionLabel,
       user: user.name,
       userId: user.id || user.roleId || '',
@@ -2075,7 +2156,7 @@ export const workflowEngine = {
       const prs = storageService.getPRs();
       const pr = prs.find(p => p.id === po.prId);
       if (pr) {
-        pr.activityLog.push({
+        addActivityLog(pr, {
           action: 'ใบสั่งซื้อถูกปิดหลังจากเคลม (PO Closed Post-Claim)',
           user: user.name,
           role: user.title,
@@ -2127,7 +2208,7 @@ export const workflowEngine = {
     let actionLabel = 'อัปเดตสถานะ PO';
     if (nextStatus === 'IN_DELIVERY') actionLabel = 'อัปเดตสถานะการจัดส่ง (In Delivery)';
 
-    po.activityLog.push({
+    addActivityLog(po, {
       action: actionLabel,
       user: user.name,
       role: user.title,
@@ -2193,7 +2274,7 @@ export const workflowEngine = {
     });
 
     po.status = 'CLOSED';
-    po.activityLog.push({
+    addActivityLog(po, {
       action: 'รับสินค้าและปิด PO (Closed)',
       user: user.name,
       role: user.title,
@@ -2214,7 +2295,7 @@ export const workflowEngine = {
     const pr = prs.find(p => p.id === po.prId);
     if (pr) {
       pr.status = 'CLOSED';
-      pr.activityLog.push({
+      addActivityLog(pr, {
         action: 'ปิดเอกสาร (Closed)',
         user: user.name,
         role: user.title,

@@ -63,6 +63,10 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
   };
 
   const handleSaveItemsEdit = async () => {
+    if (!selectedPR || !selectedPR.id) {
+      modalService.error('เกิดข้อผิดพลาด', 'ไม่พบรหัสเอกสาร PR');
+      return;
+    }
     if (!editReason.trim()) {
       modalService.warning('กรุณาระบุเหตุผลการแก้ไขรายการสินค้า');
       return;
@@ -75,7 +79,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
       onRefresh();
       modalService.success('บันทึกสำเร็จ', 'บันทึกการแก้ไขรายการสินค้าเรียบร้อย');
     } catch (err) {
-      modalService.error('เกิดข้อผิดพลาด', err.message);
+      modalService.error('เกิดข้อผิดพลาด', err.message || 'ไม่สามารถบันทึกการแก้ไขรายการสินค้าได้');
     } finally {
       setIsSavingItems(false);
     }

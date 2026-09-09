@@ -4,6 +4,19 @@ import { gasService } from './gasService.js';
 
 const DATA_VERSION = 'prpo_clean_v13';
 
+const ensureArray = (arr) => {
+  if (Array.isArray(arr)) return arr;
+  if (typeof arr === 'string' && arr.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // fallback
+    }
+  }
+  return [];
+};
+
 export const storageService = {
   // Initialize storage if empty or version mismatch
   init() {
@@ -242,14 +255,20 @@ export const storageService = {
   getPRs() {
     const data = localStorage.getItem(STORAGE_KEYS.PRS);
     const prs = data ? JSON.parse(data) : initialPRs;
-    const filtered = prs.filter(pr => pr.department === 'PD' || pr.department === 'QC');
+    const filtered = (Array.isArray(prs) ? prs : []).filter(pr => pr && (pr.department === 'PD' || pr.department === 'QC'));
     
     let needsSave = false;
     const migrated = filtered.map(pr => {
-      let itemsMigrated = false;
+      let prUpdated = false;
+      let activityLog = pr.activityLog;
+      if (!Array.isArray(activityLog)) {
+        activityLog = ensureArray(activityLog);
+        prUpdated = true;
+        needsSave = true;
+      }
       const items = (pr.items || []).map(item => {
         if (!item.purchaseUnit || !item.stockUnit || item.purchaseQty === undefined || item.stockQty === undefined) {
-          itemsMigrated = true;
+          prUpdated = true;
           needsSave = true;
           const pQty = Number(item.purchaseQty ?? item.qty) || 1;
           const rate = Number(item.conversionRate) > 0 ? Number(item.conversionRate) : 1;
@@ -269,7 +288,7 @@ export const storageService = {
         }
         return item;
       });
-      return itemsMigrated ? { ...pr, items } : pr;
+      return prUpdated ? { ...pr, items, activityLog } : pr;
     });
 
     if (needsSave) {
@@ -285,12 +304,33 @@ export const storageService = {
   getPOs() {
     const data = localStorage.getItem(STORAGE_KEYS.POS);
     const pos = data ? JSON.parse(data) : initialPOs;
-    const filtered = pos.filter(po => po.department === 'PD' || po.department === 'QC');
+    const filtered = (Array.isArray(pos) ? pos : []).filter(po => po && (po.department === 'PD' || po.department === 'QC'));
 
     let needsSave = false;
     const migrated = filtered.map(po => {
       let poUpdated = false;
       let items = po.items || [];
+
+      let activityLog = po.activityLog;
+      if (!Array.isArray(activityLog)) {
+        activityLog = ensureArray(activityLog);
+        poUpdated = true;
+        needsSave = true;
+      }
+
+      let ngItems = po.ngItems;
+      if (!Array.isArray(ngItems)) {
+        ngItems = ensureArray(ngItems);
+        poUpdated = true;
+        needsSave = true;
+      }
+
+      let claimHistory = po.claimHistory;
+      if (!Array.isArray(claimHistory)) {
+        claimHistory = ensureArray(claimHistory);
+        poUpdated = true;
+        needsSave = true;
+      }
 
       // If PO has legacy VAT, reset it so it matches PR exactly
       let vat = po.vat;
@@ -333,7 +373,7 @@ export const storageService = {
         }
         return item;
       });
-      return poUpdated ? { ...po, vat, grandTotal, items } : po;
+      return poUpdated ? { ...po, vat, grandTotal, items, activityLog, ngItems, claimHistory } : po;
     });
 
     if (needsSave) {
@@ -535,7 +575,8 @@ export const storageService = {
         requestedBy: p.requestedBy || p.requesterName || p.requester || 'Requester',
         requestedDate: p.requestedDate || p.createdAt || p.requestDate || '',
         note: p.note || p.remarks || '',
-        memo: p.memo || p.memoData || null
+        memo: p.memo || p.memoData || null,
+        activityLog: ensureArray(p.activityLog)
       }));
 
       const localPRs = this.getPRs();
@@ -555,7 +596,10 @@ export const storageService = {
       const gasPOs = data.pos.map(p => ({
         ...p,
         poNo: p.poNo || p.poNumber,
-        poNumber: p.poNumber || p.poNo
+        poNumber: p.poNumber || p.poNo,
+        activityLog: ensureArray(p.activityLog),
+        ngItems: ensureArray(p.ngItems),
+        claimHistory: ensureArray(p.claimHistory)
       }));
 
       const localPOs = this.getPOs();

@@ -159,5 +159,61 @@ describe('Scenario 2: PR Lifecycle & Workflow Transitions', () => {
     storageService.loadFromGAS({ prs: [] });
     expect(storageService.getPRs().length).toBe(0);
   });
+
+  it('Level 2 (Reviewer/Asst Manager) edits PR items successfully even when pr.activityLog is undefined or null', async () => {
+    // 1. Setup PR where activityLog is undefined (simulating Google Sheets flat sync)
+    const rawPRFromSheets = {
+      id: 'PR-SHEETS-001',
+      prNo: 'PD005/2026',
+      department: 'PD',
+      status: 'SUBMITTED',
+      totalAmount: 10000,
+      items: [
+        { productId: 'P-1', code: 'P01', name: 'Item 1', qty: 10, purchaseQty: 10, price: 1000, total: 10000 }
+      ],
+      activityLog: undefined
+    };
+    storageService.savePRs([rawPRFromSheets]);
+
+    // 2. Level 2 (Asst Manager) edits price and quantity
+    const updatedItems = [
+      { productId: 'P-1', code: 'P01', name: 'Item 1', qty: 8, purchaseQty: 8, price: 900, total: 7200 }
+    ];
+
+    // Must NOT throw "Cannot read properties of undefined (reading 'push')"
+    const result = await workflowEngine.editPRItems('PR-SHEETS-001', updatedItems, ROLES.ASST_MANAGER, 'ต่อรองราคาได้เหลือ 900 บาท');
+
+    expect(result).toBeDefined();
+    expect(result.totalAmount).toBe(7200);
+    expect(result.items[0].purchaseQty).toBe(8);
+    expect(result.items[0].price).toBe(900);
+    expect(Array.isArray(result.activityLog)).toBe(true);
+    expect(result.activityLog.length).toBe(1);
+    expect(result.activityLog[0].action).toContain('แก้ไขรายการสินค้า');
+    expect(result.activityLog[0].note).toContain('ต่อรองราคาได้เหลือ 900 บาท');
+
+    // 3. Test when activityLog is null
+    const prWithNullLog = {
+      id: 'PR-SHEETS-002',
+      prNo: 'PD006/2026',
+      department: 'PD',
+      status: 'SUBMITTED',
+      totalAmount: 5000,
+      items: [
+        { productId: 'P-2', code: 'P02', name: 'Item 2', qty: 5, purchaseQty: 5, price: 1000, total: 5000 }
+      ],
+      activityLog: null
+    };
+    storageService.savePRs([...storageService.getPRs(), prWithNullLog]);
+
+    const result2 = await workflowEngine.editPRItems('PR-SHEETS-002', [
+      { productId: 'P-2', code: 'P02', name: 'Item 2', qty: 4, purchaseQty: 4, price: 1000, total: 4000 }
+    ], ROLES.ASST_MANAGER, 'ปรับลดตามงบ');
+
+    expect(result2).toBeDefined();
+    expect(result2.totalAmount).toBe(4000);
+    expect(Array.isArray(result2.activityLog)).toBe(true);
+    expect(result2.activityLog.length).toBe(1);
+  });
 });
 
