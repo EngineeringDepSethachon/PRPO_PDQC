@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import MasterDataView from '../src/views/MasterDataView';
+import StockCardView from '../src/views/StockCardView';
 import ProductCRUDModal from '../src/components/admin/ProductCRUDModal';
 import VendorCRUDModal from '../src/components/admin/VendorCRUDModal';
 import StorageLocationCRUDModal from '../src/components/admin/StorageLocationCRUDModal';
@@ -312,6 +313,48 @@ describe('Reproduce Edit Modal Crash', () => {
     });
     expect(document.body.innerHTML).toContain('แก้ไขจุดจัดเก็บสินค้า');
     expect(document.body.innerHTML).not.toContain('(u || "").trim is not a function');
+  });
+
+  it('allows qa.backend to open StockCardView with numeric product codes without localeCompare crash', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const qaRole = {
+      id: 'QA_BACKEND',
+      roleId: 'QA_BACKEND',
+      name: 'QA ตรวจระบบหลังบ้าน',
+      title: 'Backend QA',
+      department: 'ALL',
+      level: 99,
+      canViewAllDepts: true,
+      canManageMaster: true,
+      canManageUsers: true
+    };
+
+    const productsWithNumericCodes = [
+      { id: 'P-1', code: 101, name: 'Numeric Item 1', stockBalance: 5, reorderPoint: 10, category: 'PD' },
+      { id: 'P-2', code: 202, name: 'Numeric Item 2', stockBalance: 20, reorderPoint: 5, category: 'QC' },
+      { id: 'P-3', code: 'PD-OIL-01', name: 'Regular Item', stockBalance: 0, reorderPoint: 10, category: 'PD' },
+      null,
+      {}
+    ];
+
+    await act(async () => {
+      root.render(
+        <StockCardView
+          products={productsWithNumericCodes}
+          storageLocations={[]}
+          stockLogs={[]}
+          currentRole={qaRole}
+          onQuickPR={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    expect(document.body.innerHTML).toContain('คลังสินค้าและสต็อก');
+    expect(document.body.innerHTML).not.toContain('localeCompare is not a function');
   });
 });
 

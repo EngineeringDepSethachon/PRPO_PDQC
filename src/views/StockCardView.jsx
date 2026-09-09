@@ -18,16 +18,17 @@ export default function StockCardView({ products = [], storageLocations = [], st
 
   // Available unique locations from Master Data & Products
   const availableLocations = useMemo(() => {
-    const locs = storageLocations.length > 0 ? storageLocations : storageService.getStorageLocations();
-    const locsFromMaster = locs.map(l => l.name).filter(Boolean);
-    const locsFromProds = products.map(p => p.locationName).filter(Boolean);
+    const locs = (storageLocations && storageLocations.length > 0) ? storageLocations : (storageService.getStorageLocations() || []);
+    const locsFromMaster = (locs || []).map(l => l?.name).filter(Boolean);
+    const locsFromProds = (products || []).map(p => p?.locationName).filter(Boolean);
     return Array.from(new Set([...locsFromMaster, ...locsFromProds]));
   }, [products, storageLocations]);
 
   const viewableProducts = useMemo(() => {
-    return products.filter(p => {
+    return (products || []).filter(p => {
+      if (!p) return false;
       const pCat = p.category || p.department || 'PD';
-      return currentRole.canViewAllDepts || pCat === currentRole.department;
+      return currentRole?.canViewAllDepts || pCat === currentRole?.department;
     });
   }, [products, currentRole]);
 
@@ -35,39 +36,45 @@ export default function StockCardView({ products = [], storageLocations = [], st
   const sortedAndFilteredProducts = useMemo(() => {
     return viewableProducts
       .filter(p => {
+        if (!p) return false;
         const pCat = p.category || p.department || 'PD';
         const matchesCat = categoryFilter === 'ALL' || pCat === categoryFilter;
         const matchesLocation = selectedLocation === 'ALL' || p.locationName === selectedLocation;
-        const q = searchQuery.trim().toLowerCase();
+        const q = String(searchQuery || '').trim().toLowerCase();
         const matchesSearch = !q || 
-          (p.name && p.name.toLowerCase().includes(q)) || 
-          (p.code && p.code.toLowerCase().includes(q)) ||
-          (p.locationName && p.locationName.toLowerCase().includes(q));
+          (p.name && String(p.name).toLowerCase().includes(q)) || 
+          (p.code && String(p.code).toLowerCase().includes(q)) ||
+          (p.locationName && String(p.locationName).toLowerCase().includes(q));
         return matchesCat && matchesLocation && matchesSearch;
       })
       .sort((a, b) => {
-        const aLow = a.stockBalance <= a.reorderPoint ? 1 : 0;
-        const bLow = b.stockBalance <= b.reorderPoint ? 1 : 0;
+        if (!a || !b) return 0;
+        const aBal = Number(a.stockBalance) || 0;
+        const aRop = Number(a.reorderPoint) || 0;
+        const bBal = Number(b.stockBalance) || 0;
+        const bRop = Number(b.reorderPoint) || 0;
+        const aLow = aBal <= aRop ? 1 : 0;
+        const bLow = bBal <= bRop ? 1 : 0;
         if (aLow !== bLow) return bLow - aLow;
-        const aRatio = a.reorderPoint > 0 ? (a.stockBalance / a.reorderPoint) : 999;
-        const bRatio = b.reorderPoint > 0 ? (b.stockBalance / b.reorderPoint) : 999;
+        const aRatio = aRop > 0 ? (aBal / aRop) : 999;
+        const bRatio = bRop > 0 ? (bBal / bRop) : 999;
         if (aRatio !== bRatio) return aRatio - bRatio;
-        return (a.code || '').localeCompare(b.code || '');
+        return String(a.code || '').localeCompare(String(b.code || ''));
       });
   }, [viewableProducts, categoryFilter, selectedLocation, searchQuery]);
 
   // Count of items requiring reorder
   const lowStockCount = useMemo(() => {
-    return viewableProducts.filter(p => p.stockBalance <= p.reorderPoint).length;
+    return viewableProducts.filter(p => p && (Number(p.stockBalance) || 0) <= (Number(p.reorderPoint) || 0)).length;
   }, [viewableProducts]);
 
   // ROP Analytics Computation
   const ropAnalytics = useMemo(() => {
-    const viewableProducts = currentRole.canViewAllDepts
-      ? products
-      : products.filter(p => p.category === currentRole.department);
+    const list = currentRole?.canViewAllDepts
+      ? (products || []).filter(Boolean)
+      : (products || []).filter(p => p && p.category === currentRole?.department);
 
-    return viewableProducts.map(prod => {
+    return list.map(prod => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -331,8 +338,8 @@ export default function StockCardView({ products = [], storageLocations = [], st
                       </td>
                     </tr>
                   ) : (
-                    sortedAndFilteredProducts.map(prod => {
-                      const isLow = prod.stockBalance <= prod.reorderPoint;
+                    sortedAndFilteredProducts.map((prod, idx) => {
+                      const isLow = (Number(prod.stockBalance) || 0) <= (Number(prod.reorderPoint) || 0);
                       const sUnit = prod.stockUnit || prod.unit || 'ชิ้น';
                       const pUnit = prod.purchaseUnit || prod.unit || sUnit;
                       const rate = Number(prod.conversionRate) > 0 ? Number(prod.conversionRate) : 1;
@@ -343,7 +350,7 @@ export default function StockCardView({ products = [], storageLocations = [], st
 
                       return (
                         <tr 
-                          key={prod.id} 
+                          key={prod.id || prod.code || idx} 
                           className={`hover:bg-slate-50/80 group transition-colors ${
                             isLow ? 'bg-amber-50/30' : ''
                           }`}
@@ -474,8 +481,8 @@ export default function StockCardView({ products = [], storageLocations = [], st
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {ropAnalytics.map(item => (
-                    <tr key={item.id} className={`hover:bg-slate-50/80 transition-colors ${item.isRopUnderSuggested ? 'bg-amber-50/30' : ''}`}>
+                  {ropAnalytics.map((item, idx) => (
+                    <tr key={item.id || item.code || idx} className={`hover:bg-slate-50/80 transition-colors ${item.isRopUnderSuggested ? 'bg-amber-50/30' : ''}`}>
                       <td className="py-4 pl-6 whitespace-nowrap">
                         <div className="font-mono font-bold text-slate-500 text-xs">{item.code}</div>
                         <div className="font-semibold text-slate-900 text-sm mt-0.5">{item.name}</div>

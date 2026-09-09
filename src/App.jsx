@@ -269,33 +269,39 @@ export default function App() {
           )}
 
           {activeView === 'stock-card' && (
-            <StockCardView
-              products={products}
-              storageLocations={storageLocations}
-              stockLogs={stockLogs}
-              currentRole={currentRole}
-              onQuickPR={handleQuickPR}
-              onRefresh={refreshData}
-            />
+            <ErrorBoundary name="StockCardView">
+              <StockCardView
+                products={products}
+                storageLocations={storageLocations}
+                stockLogs={stockLogs}
+                currentRole={currentRole}
+                onQuickPR={handleQuickPR}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
           )}
 
           {activeView === 'quick-issue' && (
-            <QuickIssueView
-              products={products}
-              stockLogs={stockLogs}
-              currentRole={currentRole}
-              onRefresh={refreshData}
-            />
+            <ErrorBoundary name="QuickIssueView">
+              <QuickIssueView
+                products={products}
+                stockLogs={stockLogs}
+                currentRole={currentRole}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
           )}
 
           {activeView === 'budget' && (
-            <BudgetView
-              budgetSummary={budgetSummary}
-              currentRole={currentRole}
-              prs={prs}
-              pos={pos}
-              onRefresh={refreshData}
-            />
+            <ErrorBoundary name="BudgetView">
+              <BudgetView
+                budgetSummary={budgetSummary}
+                currentRole={currentRole}
+                prs={prs}
+                pos={pos}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
           )}
 
           {activeView === 'master-data' && (
@@ -312,14 +318,18 @@ export default function App() {
           )}
 
           {activeView === 'online-tasks' && (
-            <OnlineTaskView
-              currentRole={currentRole}
-              onRefresh={refreshData}
-            />
+            <ErrorBoundary name="OnlineTaskView">
+              <OnlineTaskView
+                currentRole={currentRole}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
           )}
 
           {activeView === 'audit-logs' && (
-            <AuditLogView currentRole={currentRole} />
+            <ErrorBoundary name="AuditLogView">
+              <AuditLogView currentRole={currentRole} />
+            </ErrorBoundary>
           )}
         </main>
 

@@ -93,12 +93,13 @@ export default function QuickIssueView({ products = [], stockLogs = [], currentR
   const filteredProducts = useMemo(() => {
     return products
       .filter(p => {
+        if (!p) return false;
         const pCat = p.category || p.department || 'PD';
-        const matchesDept = currentRole.canViewAllDepts || pCat === currentRole.department;
+        const matchesDept = currentRole?.canViewAllDepts || pCat === currentRole?.department;
         const matchesCat = categoryFilter === 'ALL' || pCat === categoryFilter;
         return matchesDept && matchesCat;
       })
-      .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
   }, [products, currentRole, categoryFilter]);
 
   // Transform to SearchableSelect options

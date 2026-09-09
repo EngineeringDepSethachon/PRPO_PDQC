@@ -15,10 +15,11 @@ export default function StockAdjustmentModal({ products = [], currentRole, onClo
 
   // Only show products matching this role's dept
   const availableProducts = useMemo(() => {
-    return (currentRole.canViewAllDepts
-      ? products
-      : products.filter(p => (p.category || p.department) === currentRole.department)
-    ).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+    const list = Array.isArray(products) ? products.filter(Boolean) : [];
+    return (currentRole?.canViewAllDepts
+      ? list
+      : list.filter(p => (p.category || p.department) === currentRole?.department)
+    ).sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
   }, [products, currentRole]);
 
   const productOptions = useMemo(() => {

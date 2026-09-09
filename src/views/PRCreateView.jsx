@@ -60,13 +60,15 @@ export default function PRCreateView({
 
   // Filter products by the active department (robust case-insensitive matching)
   const availableProducts = useMemo(() => {
-    const cleanDept = (department || '').trim().toUpperCase();
-    return products
+    const cleanDept = String(department || '').trim().toUpperCase();
+    return (products || [])
+      .filter(Boolean)
       .filter(p => {
-        const pCat = (p.category || p.department || (p.code?.startsWith('QC-') ? 'QC' : 'PD')).trim().toUpperCase();
+        const pCodeStr = String(p.code || '');
+        const pCat = String(p.category || p.department || (pCodeStr.startsWith('QC-') ? 'QC' : 'PD')).trim().toUpperCase();
         return pCat === cleanDept;
       })
-      .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
   }, [products, department]);
 
 
