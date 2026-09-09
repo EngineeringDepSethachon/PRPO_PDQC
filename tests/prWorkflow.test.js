@@ -141,5 +141,23 @@ describe('Scenario 2: PR Lifecycle & Workflow Transitions', () => {
     expect(prsAfterMerge.some(p => p.id === newPR.id || p.prNo === newPR.prNo)).toBe(true);
     expect(prsAfterMerge.some(p => p.prNo === 'PD999/2026')).toBe(true);
   });
+
+  it('Deleted PR in Google Sheets is removed from frontend upon GAS sync', () => {
+    // 1. Existing synced PRs (already in Google Sheets, so no _pendingGasSync)
+    const pr1 = { id: 'PR-1', prNo: 'PD001/2026', department: 'PD', status: 'SUBMITTED', items: [] };
+    const pr2 = { id: 'PR-2', prNo: 'PD002/2026', department: 'PD', status: 'SUBMITTED', items: [] };
+    storageService.savePRs([pr1, pr2]);
+    expect(storageService.getPRs().length).toBe(2);
+
+    // 2. User deletes PR-2 from Google Sheets (remote returns only PR-1)
+    storageService.loadFromGAS({ prs: [pr1] });
+    const prsAfterDelete = storageService.getPRs();
+    expect(prsAfterDelete.length).toBe(1);
+    expect(prsAfterDelete.some(p => p.id === 'PR-2')).toBe(false);
+
+    // 3. User deletes all PRs from Google Sheets (remote returns empty array)
+    storageService.loadFromGAS({ prs: [] });
+    expect(storageService.getPRs().length).toBe(0);
+  });
 });
 

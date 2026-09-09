@@ -103,30 +103,56 @@ export const apiService = {
     };
   },
 
+  _clearPendingPR(pr) {
+    if (!pr) return;
+    const currentPRs = storageService.getPRs();
+    const target = currentPRs.find(p => (p.id && p.id === pr.id) || (p.prNo && p.prNo === (pr.prNo || pr.prNumber)));
+    if (target && target._pendingGasSync) {
+      delete target._pendingGasSync;
+      storageService.savePRs(currentPRs);
+    }
+  },
+
+  _clearPendingPO(po) {
+    if (!po) return;
+    const currentPOs = storageService.getPOs();
+    const target = currentPOs.find(p => (p.id && p.id === po.id) || (p.poNo && p.poNo === (po.poNo || po.poNumber)));
+    if (target && target._pendingGasSync) {
+      delete target._pendingGasSync;
+      storageService.savePOs(currentPOs);
+    }
+  },
+
   // --- PR Operations ---
   async createPR(prData, user, isDraft = false) {
     const newPR = await workflowEngine.createPR(prData, user, isDraft);
     // Background sync to GAS
-    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(newPR) }, user).catch(err => {
-      console.warn('[ApiService] Background savePR to GAS failed:', err);
-    });
+    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(newPR) }, user)
+      .then(() => this._clearPendingPR(newPR))
+      .catch(err => {
+        console.warn('[ApiService] Background savePR to GAS failed:', err);
+      });
     return newPR;
   },
 
   async updatePR(prId, prData, user, isDraft = false) {
     const updatedPR = await workflowEngine.updatePR(prId, prData, user, isDraft);
-    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(updatedPR) }, user).catch(err => {
-      console.warn('[ApiService] Background savePR update to GAS failed:', err);
-    });
+    gasService.sendMutation('savePR', { prData: this._formatPRForGAS(updatedPR) }, user)
+      .then(() => this._clearPendingPR(updatedPR))
+      .catch(err => {
+        console.warn('[ApiService] Background savePR update to GAS failed:', err);
+      });
     return updatedPR;
   },
 
   async submitPR(prId, user, memoData = null) {
     const res = await workflowEngine.submitPR(prId, user, memoData);
     if (res) {
-      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user).catch(err => {
-        console.warn('[ApiService] Background savePR submit to GAS failed:', err);
-      });
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(res) }, user)
+        .then(() => this._clearPendingPR(res))
+        .catch(err => {
+          console.warn('[ApiService] Background savePR submit to GAS failed:', err);
+        });
     }
     return res;
   },
@@ -135,15 +161,19 @@ export const apiService = {
     const res = await workflowEngine.updatePRStatus(prId, nextStatus, user, note);
     const pr = res?.pr || res;
     if (pr && (pr.prNo || pr.prNumber)) {
-      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(pr) }, user).catch(err => {
-        console.warn('[ApiService] Background savePR status update to GAS failed:', err);
-      });
+      gasService.sendMutation('savePR', { prData: this._formatPRForGAS(pr) }, user)
+        .then(() => this._clearPendingPR(pr))
+        .catch(err => {
+          console.warn('[ApiService] Background savePR status update to GAS failed:', err);
+        });
     }
     // If a PO was generated upon approval, sync the PO to GAS
     if (res?.po) {
-      gasService.sendMutation('savePO', { poData: res.po }, user).catch(err => {
-        console.warn('[ApiService] Background savePO to GAS failed:', err);
-      });
+      gasService.sendMutation('savePO', { poData: res.po }, user)
+        .then(() => this._clearPendingPO(res.po))
+        .catch(err => {
+          console.warn('[ApiService] Background savePO to GAS failed:', err);
+        });
     }
     // If budget was updated upon approval, sync budget to GAS
     if (res?.budget && pr?.department) {

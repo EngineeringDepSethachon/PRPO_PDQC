@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { gasService } from '../../services/gasService';
 import { storageService } from '../../services/storageService';
+import { apiService } from '../../services/apiService';
 import Portal from './Portal';
 
 
@@ -84,9 +85,9 @@ export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
     setActionFeedback(null);
     try {
       gasService.setGasUrl(gasUrl);
-      const data = await gasService.pullInitialData();
+      const data = await apiService.syncFromGAS();
       if (data) {
-        if (onDataSynced) await onDataSynced();
+        if (onDataSynced) await onDataSynced(true);
         setLastSyncTime(gasService.getLastSyncTime());
         setSyncStatus('CONNECTED');
         setActionFeedback({

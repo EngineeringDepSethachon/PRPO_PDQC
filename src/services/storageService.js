@@ -488,99 +488,94 @@ export const storageService = {
 
   loadFromGAS(data) {
     if (!data) return false;
-    if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+
+    // 1. Products: overwrite local storage with Google Sheets data
+    if (Array.isArray(data.products)) {
       localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
     }
-    if (data.vendors && Array.isArray(data.vendors) && data.vendors.length > 0) {
+
+    // 2. Vendors: overwrite local storage with Google Sheets data
+    if (Array.isArray(data.vendors)) {
       localStorage.setItem(STORAGE_KEYS.VENDORS, JSON.stringify(data.vendors));
     }
-    if (data.storageLocations && Array.isArray(data.storageLocations) && data.storageLocations.length > 0) {
+
+    // 3. Storage Locations: overwrite local storage with Google Sheets data
+    if (Array.isArray(data.storageLocations)) {
       localStorage.setItem(STORAGE_KEYS.STORAGE_LOCATIONS, JSON.stringify(data.storageLocations));
     }
     
-    // Intelligent merge for PRs: NEVER wipe local PRs if GAS is empty or missing newly created local PRs
-    if (data.prs && Array.isArray(data.prs)) {
+    // 4. PRs: Sync directly from Google Sheets (Single Source of Truth)
+    // Only preserve local PRs that are actively in-flight/pending sync (_pendingGasSync === true)
+    if (Array.isArray(data.prs)) {
+      const gasPRs = data.prs.map(p => ({
+        ...p,
+        prNo: p.prNo || p.prNumber,
+        prNumber: p.prNumber || p.prNo,
+        requestedBy: p.requestedBy || p.requesterName || p.requester || 'Requester',
+        requestedDate: p.requestedDate || p.createdAt || p.requestDate || '',
+        note: p.note || p.remarks || '',
+        memo: p.memo || p.memoData || null
+      }));
+
       const localPRs = this.getPRs();
-      if (data.prs.length === 0 && localPRs.length > 0) {
-        // Keep local PRs intact when remote is empty
-      } else {
-        const gasPRs = data.prs.map(p => ({
-          ...p,
-          prNo: p.prNo || p.prNumber,
-          prNumber: p.prNumber || p.prNo,
-          requestedBy: p.requestedBy || p.requesterName || p.requester || 'Requester',
-          requestedDate: p.requestedDate || p.createdAt || p.requestDate || ''
-        }));
-        const mergedPRs = [...gasPRs];
-        // Preserve any local PR not yet in GAS
-        localPRs.forEach(lp => {
-          const exists = mergedPRs.some(gp => 
-            (gp.id && gp.id === lp.id) || 
-            (gp.prNo && gp.prNo === (lp.prNo || lp.prNumber)) || 
-            (gp.prNumber && gp.prNumber === (lp.prNumber || lp.prNo))
-          );
-          if (!exists) {
-            mergedPRs.unshift(lp);
-          }
-        });
-        localStorage.setItem(STORAGE_KEYS.PRS, JSON.stringify(mergedPRs));
-      }
+      const pendingPRs = localPRs.filter(lp => lp._pendingGasSync === true && !gasPRs.some(gp => 
+        (gp.id && gp.id === lp.id) || 
+        (gp.prNo && gp.prNo === (lp.prNo || lp.prNumber)) || 
+        (gp.prNumber && gp.prNumber === (lp.prNumber || lp.prNo))
+      ));
+
+      const finalPRs = [...pendingPRs, ...gasPRs];
+      localStorage.setItem(STORAGE_KEYS.PRS, JSON.stringify(finalPRs));
     }
 
-    // Intelligent merge for POs: NEVER wipe local POs if GAS is empty or missing newly created local POs
-    if (data.pos && Array.isArray(data.pos)) {
+    // 5. POs: Sync directly from Google Sheets
+    // Only preserve local POs that are actively in-flight/pending sync (_pendingGasSync === true)
+    if (Array.isArray(data.pos)) {
+      const gasPOs = data.pos.map(p => ({
+        ...p,
+        poNo: p.poNo || p.poNumber,
+        poNumber: p.poNumber || p.poNo
+      }));
+
       const localPOs = this.getPOs();
-      if (data.pos.length === 0 && localPOs.length > 0) {
-        // Keep local POs intact
-      } else {
-        const gasPOs = data.pos.map(p => ({
-          ...p,
-          poNo: p.poNo || p.poNumber,
-          poNumber: p.poNumber || p.poNo
-        }));
-        const mergedPOs = [...gasPOs];
-        localPOs.forEach(lp => {
-          const exists = mergedPOs.some(gp => 
-            (gp.id && gp.id === lp.id) || 
-            (gp.poNo && gp.poNo === (lp.poNo || lp.poNumber)) || 
-            (gp.poNumber && gp.poNumber === (lp.poNumber || lp.poNo))
-          );
-          if (!exists) {
-            mergedPOs.unshift(lp);
-          }
-        });
-        localStorage.setItem(STORAGE_KEYS.POS, JSON.stringify(mergedPOs));
-      }
+      const pendingPOs = localPOs.filter(lp => lp._pendingGasSync === true && !gasPOs.some(gp => 
+        (gp.id && gp.id === lp.id) || 
+        (gp.poNo && gp.poNo === (lp.poNo || lp.poNumber)) || 
+        (gp.poNumber && gp.poNumber === (lp.poNumber || lp.poNo))
+      ));
+
+      const finalPOs = [...pendingPOs, ...gasPOs];
+      localStorage.setItem(STORAGE_KEYS.POS, JSON.stringify(finalPOs));
     }
 
-    // Intelligent merge for StockLogs
-    if (data.stockLogs && Array.isArray(data.stockLogs)) {
+    // 6. Stock Logs: Sync directly from Google Sheets
+    if (Array.isArray(data.stockLogs)) {
       const localLogs = this.getStockLogs();
-      if (data.stockLogs.length === 0 && localLogs.length > 0) {
-        // Keep local stock logs intact
-      } else {
-        const mergedLogs = [...data.stockLogs];
-        localLogs.forEach(ll => {
-          if (!mergedLogs.some(gl => gl.id === ll.id)) {
-            mergedLogs.unshift(ll);
-          }
-        });
-        localStorage.setItem(STORAGE_KEYS.STOCK_LOGS, JSON.stringify(mergedLogs));
-      }
+      const pendingLogs = localLogs.filter(ll => ll._pendingGasSync === true && !data.stockLogs.some(gl => gl.id === ll.id));
+      const finalLogs = [...pendingLogs, ...data.stockLogs];
+      localStorage.setItem(STORAGE_KEYS.STOCK_LOGS, JSON.stringify(finalLogs));
     }
 
-    if (data.budgets && typeof data.budgets === 'object' && Object.keys(data.budgets).length > 0) {
+    // 7. Budgets
+    if (data.budgets && typeof data.budgets === 'object') {
       localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(data.budgets));
     }
-    if (data.auditLogs && Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
+
+    // 8. Audit Logs
+    if (Array.isArray(data.auditLogs)) {
       localStorage.setItem('prpo_audit_logs', JSON.stringify(data.auditLogs));
     }
-    if (data.notifications && Array.isArray(data.notifications) && data.notifications.length > 0) {
+
+    // 9. Notifications
+    if (Array.isArray(data.notifications)) {
       localStorage.setItem('prpo_notifications', JSON.stringify(data.notifications));
     }
-    if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+
+    // 10. Users
+    if (Array.isArray(data.users)) {
       localStorage.setItem('prpo_registered_users', JSON.stringify(data.users));
     }
+
     return true;
   }
 };

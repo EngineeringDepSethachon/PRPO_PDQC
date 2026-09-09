@@ -929,6 +929,7 @@ export const workflowEngine = {
       createdAt: timestamp,
       updatedAt: timestamp,
       memo: prData.memo || null,
+      _pendingGasSync: true,
       activityLog: [
         {
           action: isDraft ? 'สร้างแบบร่าง PR (Draft Created)' : 'สร้างและยื่นส่ง PR (PR Submitted)',
@@ -1063,6 +1064,7 @@ export const workflowEngine = {
     pr.note = prData.note || '';
     if (prData.memo !== undefined) pr.memo = prData.memo;
     pr.status = nextStatus;
+    pr._pendingGasSync = true;
 
     if (!Array.isArray(pr.activityLog)) pr.activityLog = [];
     pr.activityLog.push({
@@ -1304,6 +1306,7 @@ export const workflowEngine = {
         poNo,
         prId: pr.id,
         prNo: pr.prNo,
+        _pendingGasSync: true,
         // ─── Snapshot PR ownership data so Requester can always access this PO ───
         requestedBy: pr.requestedBy || '',
         requesterId: pr.requesterId || null,
