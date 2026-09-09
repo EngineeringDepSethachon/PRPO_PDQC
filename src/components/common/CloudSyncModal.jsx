@@ -21,7 +21,7 @@ import { apiService } from '../../services/apiService';
 import Portal from './Portal';
 
 
-export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
+export default function CloudSyncModal({ isOpen, onClose, onDataSynced, currentRole }) {
   const [gasUrl, setGasUrl] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -30,6 +30,16 @@ export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [actionFeedback, setActionFeedback] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  const isLevel99 = Boolean(
+    Number(currentRole?.level) >= 99 ||
+    currentRole?.canManageCloudSync ||
+    currentRole?.canViewAuditLogs ||
+    currentRole?.id === 'ADMIN' || 
+    currentRole?.roleId === 'ADMIN' || 
+    currentRole?.positionKey === 'ADMIN' || 
+    currentRole?.role === 'ADMIN'
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -44,7 +54,14 @@ export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
   if (!isOpen) return null;
 
   const handleSaveUrl = () => {
-    gasService.setGasUrl(gasUrl);
+    if (!isLevel99) {
+      setActionFeedback({
+        type: 'error',
+        message: 'ปฏิเสธการเข้าถึง: เฉพาะผู้ดูแลระบบระดับ Level 99 เท่านั้นที่มีสิทธิ์แก้ไข Google Apps Script Web App URL'
+      });
+      return;
+    }
+    gasService.setGasUrl(gasUrl, currentRole);
     setSyncStatus(gasService.getSyncStatus());
     setActionFeedback({
       type: 'success',
@@ -191,6 +208,17 @@ export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
               </div>
             </div>
 
+            {/* Level 99 Security Notice */}
+            {!isLevel99 && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">จำกัดสิทธิ์เฉพาะ Level 99 (ผู้ดูแลระบบ):</span>
+                  <p className="mt-0.5 text-slate-600">บัญชีของคุณไม่มีสิทธิ์แก้ไข Google Apps Script Web App URL เพื่อป้องกันข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล</p>
+                </div>
+              </div>
+            )}
+
             {/* Input URL */}
             <div className="space-y-2">
               <label className="font-semibold text-slate-900 text-xs flex items-center justify-between">
@@ -202,12 +230,16 @@ export default function CloudSyncModal({ isOpen, onClose, onDataSynced }) {
                   type="url"
                   value={gasUrl}
                   onChange={(e) => setGasUrl(e.target.value)}
+                  disabled={!isLevel99}
                   placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
-                  className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  className={`flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono ${
+                    !isLevel99 ? 'opacity-60 cursor-not-allowed bg-slate-100' : ''
+                  }`}
                 />
                 <button
                   onClick={handleSaveUrl}
-                  className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold hover:bg-slate-700 active:scale-95 transition-all shadow-xs"
+                  disabled={!isLevel99}
+                  className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold hover:bg-slate-700 active:scale-95 transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   บันทึก
                 </button>

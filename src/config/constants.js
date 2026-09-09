@@ -22,6 +22,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 1,
   },
   REVIEWER: {
@@ -44,6 +45,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 2,
   },
   APPROVER: {
@@ -66,6 +68,7 @@ export const ROLES = {
     canSetBudget: true,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 3,
   },
   ONLINE_PURCHASER: {
@@ -88,6 +91,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: true, // รับ Task Online, Update Actual Price, ปิด PO Online
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 2,
   },
   ADMIN: {
@@ -110,6 +114,7 @@ export const ROLES = {
     canSetBudget: true,
     canOnlinePurchase: true,
     canViewAuditLogs: true,
+    canManageCloudSync: true,
     level: 99,
   },
 
@@ -134,6 +139,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 1,
   },
   REQUESTER_QC: {
@@ -156,6 +162,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 1,
   },
   ASST_MANAGER: {
@@ -178,6 +185,7 @@ export const ROLES = {
     canSetBudget: false,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 2,
   },
   PLANT_MANAGER: {
@@ -200,6 +208,7 @@ export const ROLES = {
     canSetBudget: true,
     canOnlinePurchase: false,
     canViewAuditLogs: false,
+    canManageCloudSync: false,
     level: 3,
   },
 };
@@ -270,6 +279,7 @@ export function resolveUserPermissions(user) {
 
     // ─── ADMIN ONLY PERMISSIONS (ผู้ดูแลระบบเท่านั้น) ───
     canViewAuditLogs: level >= 99,
+    canManageCloudSync: level >= 99,
   };
 }
 

@@ -27,6 +27,16 @@ export default function Navbar({
     return unsubscribe;
   }, []);
 
+  const isLevel99 = Boolean(
+    Number(currentRole?.level) >= 99 ||
+    currentRole?.canManageCloudSync ||
+    currentRole?.canViewAuditLogs ||
+    currentRole?.id === 'ADMIN' || 
+    currentRole?.roleId === 'ADMIN' || 
+    currentRole?.positionKey === 'ADMIN' || 
+    currentRole?.role === 'ADMIN'
+  );
+
   return (
     <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 no-print">
       <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -69,34 +79,36 @@ export default function Navbar({
         {/* Right Section: Cloud Sync Button + Notification Bell + User Profile Badge */}
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Cloud Sync Status Button */}
-          <button
-            onClick={() => setShowCloudModal(true)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 ${
-              syncStatus === 'CONNECTED'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                : syncStatus === 'ERROR'
-                ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
-                : syncStatus === 'SYNCING'
-                ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            }`}
-            title="คลิกเพื่อตั้งค่าเชื่อมต่อ Google Sheets & Apps Script"
-          >
-            <span className={`w-2 h-2 rounded-full ${
-              syncStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' :
-              syncStatus === 'ERROR' ? 'bg-rose-500' :
-              syncStatus === 'SYNCING' ? 'bg-blue-500 animate-spin' :
-              'bg-amber-400'
-            }`} />
-            <Cloud className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline text-[11px]">
-              {syncStatus === 'CONNECTED' ? 'Google Sheets Live' :
-               syncStatus === 'SYNCING' ? 'กำลังซิงค์...' :
-               syncStatus === 'ERROR' ? 'ซิงค์ผิดพลาด' :
-               'เชื่อมต่อชีต'}
-            </span>
-          </button>
+          {/* Cloud Sync Status Button - Restricted: Only visible to Level 99 */}
+          {isLevel99 && (
+            <button
+              onClick={() => setShowCloudModal(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                syncStatus === 'CONNECTED'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  : syncStatus === 'ERROR'
+                  ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                  : syncStatus === 'SYNCING'
+                  ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+              title="คลิกเพื่อตั้งค่าเชื่อมต่อ Google Sheets & Apps Script (เฉพาะผู้ดูแลระบบ Level 99)"
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                syncStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' :
+                syncStatus === 'ERROR' ? 'bg-rose-500' :
+                syncStatus === 'SYNCING' ? 'bg-blue-500 animate-spin' :
+                'bg-amber-400'
+              }`} />
+              <Cloud className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline text-[11px]">
+                {syncStatus === 'CONNECTED' ? 'Google Sheets Live' :
+                 syncStatus === 'SYNCING' ? 'กำลังซิงค์...' :
+                 syncStatus === 'ERROR' ? 'ซิงค์ผิดพลาด' :
+                 'เชื่อมต่อชีต'}
+              </span>
+            </button>
+          )}
 
           {/* In-App Notification Bell */}
           <NotificationBell 
@@ -139,12 +151,15 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Cloud Sync Modal */}
-      <CloudSyncModal
-        isOpen={showCloudModal}
-        onClose={() => setShowCloudModal(false)}
-        onDataSynced={onRefresh}
-      />
+      {/* Cloud Sync Modal (Level 99 Only) */}
+      {isLevel99 && (
+        <CloudSyncModal
+          isOpen={showCloudModal}
+          onClose={() => setShowCloudModal(false)}
+          onDataSynced={onRefresh}
+          currentRole={currentRole}
+        />
+      )}
 
       {/* Notification Drawer Component */}
       <NotificationDrawer

@@ -158,6 +158,27 @@ describe('Scenario 1: Roles & Permission Matrix', () => {
     expect(onlinePerms.canViewBudget).toBe(false);
     expect(onlinePerms.id).toBe('ONLINE_PURCHASER');
   });
+
+  it('Cloud Sync & GAS URL Configuration: Restricted strictly to Level 99 Admin', () => {
+    // Level 1, 2, 3 must NOT have canManageCloudSync
+    expect(ROLES.REQUESTER.canManageCloudSync).toBe(false);
+    expect(ROLES.REVIEWER.canManageCloudSync).toBe(false);
+    expect(ROLES.APPROVER.canManageCloudSync).toBe(false);
+    expect(ROLES.ONLINE_PURCHASER.canManageCloudSync).toBe(false);
+    expect(ROLES.REQUESTER_PD.canManageCloudSync).toBe(false);
+    expect(ROLES.REQUESTER_QC.canManageCloudSync).toBe(false);
+    expect(ROLES.ASST_MANAGER.canManageCloudSync).toBe(false);
+    expect(ROLES.PLANT_MANAGER.canManageCloudSync).toBe(false);
+
+    // Only ADMIN (Level 99) has canManageCloudSync = true
+    expect(ROLES.ADMIN.canManageCloudSync).toBe(true);
+
+    // Dynamic resolution
+    expect(resolveUserPermissions({ level: 1 }).canManageCloudSync).toBe(false);
+    expect(resolveUserPermissions({ level: 2 }).canManageCloudSync).toBe(false);
+    expect(resolveUserPermissions({ level: 3 }).canManageCloudSync).toBe(false);
+    expect(resolveUserPermissions({ level: 99 }).canManageCloudSync).toBe(true);
+  });
 });
 
 

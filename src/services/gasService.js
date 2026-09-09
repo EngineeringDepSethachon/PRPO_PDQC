@@ -23,8 +23,12 @@ class GasService {
   }
 
 
-  // Set & Save GAS Web App URL
-  setGasUrl(url) {
+  // Set & Save GAS Web App URL (Restricted to Level 99)
+  setGasUrl(url, operator = null) {
+    if (operator && Number(operator.level) < 99) {
+      console.warn('[GasService] Unauthorized: Non-level 99 user cannot change GAS URL');
+      return false;
+    }
     if (url && url.trim()) {
       localStorage.setItem(STORAGE_KEY_GAS_URL, url.trim());
       localStorage.setItem(STORAGE_KEY_SYNC_STATUS, 'CONNECTED');
@@ -33,6 +37,7 @@ class GasService {
       localStorage.setItem(STORAGE_KEY_SYNC_STATUS, 'OFFLINE');
     }
     this.notifyListeners();
+    return true;
   }
 
   isConfigured() {
