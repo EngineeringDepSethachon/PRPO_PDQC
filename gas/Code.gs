@@ -1090,11 +1090,64 @@ function getSheetRecords(ss, sheetName, jsonFields = []) {
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
   const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
   const headers = values[0];
   const records = [];
 
+  const idCol = headers.indexOf('id');
+  const codeCol = headers.indexOf('code');
+  const nameCol = headers.indexOf('name');
+  const userCol = headers.indexOf('username');
+  const prCol = headers.indexOf('prNumber');
+  const poCol = headers.indexOf('poNumber');
+  const deptCol = headers.indexOf('department');
+
+  const rowsToDelete = [];
+
   for (let r = 1; r < values.length; r++) {
     const row = values[r];
+
+    // Check if the row has a genuine identifier or is a ghost row from clearing cells
+    let hasIdentity = false;
+    if (sheetName === 'Products') {
+      const code = codeCol !== -1 ? String(row[codeCol] || '').trim() : '';
+      const name = nameCol !== -1 ? String(row[nameCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(code || name || id);
+    } else if (sheetName === 'Vendors') {
+      const name = nameCol !== -1 ? String(row[nameCol] || '').trim() : '';
+      const code = codeCol !== -1 ? String(row[codeCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(name || code || id);
+    } else if (sheetName === 'StorageLocations') {
+      const name = nameCol !== -1 ? String(row[nameCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(name || id);
+    } else if (sheetName === 'Users') {
+      const username = userCol !== -1 ? String(row[userCol] || '').trim() : '';
+      const name = nameCol !== -1 ? String(row[nameCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(username || name || id);
+    } else if (sheetName === 'PRs') {
+      const prNo = prCol !== -1 ? String(row[prCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(prNo || id);
+    } else if (sheetName === 'POs') {
+      const poNo = poCol !== -1 ? String(row[poCol] || '').trim() : '';
+      const id = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      hasIdentity = Boolean(poNo || id);
+    } else if (sheetName === 'Budgets') {
+      const dept = deptCol !== -1 ? String(row[deptCol] || '').trim() : '';
+      hasIdentity = Boolean(dept);
+    } else {
+      hasIdentity = row.some(cell => cell !== '' && cell !== null && cell !== undefined);
+    }
+
+    if (!hasIdentity) {
+      rowsToDelete.push(r + 1);
+      continue;
+    }
+
     const obj = {};
     for (let c = 0; c < headers.length; c++) {
       const key = headers[c];
@@ -1106,6 +1159,18 @@ function getSheetRecords(ss, sheetName, jsonFields = []) {
     }
     records.push(obj);
   }
+
+  // Delete ghost rows in reverse order to keep indices accurate
+  if (rowsToDelete.length > 0) {
+    try {
+      for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+        sheet.deleteRow(rowsToDelete[i]);
+      }
+    } catch (cleanErr) {
+      console.warn('Ghost row cleanup skipped:', cleanErr);
+    }
+  }
+
   return records;
 }
 

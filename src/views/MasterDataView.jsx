@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Database, Plus, Edit3, Trash2, ShieldAlert, Building2, Search, X, Package, Store, PenTool, MapPin, Layers, Boxes, Users as UsersIcon, Key, Eye, EyeOff, ShieldCheck, UserCheck } from 'lucide-react';
+import { Database, Plus, Edit3, Trash2, ShieldAlert, Building2, Search, X, Package, Store, PenTool, MapPin, Layers, Boxes, Users as UsersIcon, Key, Eye, EyeOff, ShieldCheck, UserCheck, RefreshCw } from 'lucide-react';
 import ProductCRUDModal from '../components/admin/ProductCRUDModal';
 import VendorCRUDModal from '../components/admin/VendorCRUDModal';
 import StorageLocationCRUDModal from '../components/admin/StorageLocationCRUDModal';
@@ -43,50 +43,56 @@ export default function MasterDataView({
 
 
 
-  // Filtered Products
+  // Filtered Products (Filter out ghost/cleared records)
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchesDeptRole = canSeeAll || p.category === myDept;
-      const matchesCategory = prodCategoryFilter === 'ALL' || p.category === prodCategoryFilter;
-      const q = prodSearch.trim().toLowerCase();
-      const matchesSearch = !q || (
-        p.code?.toLowerCase().includes(q) ||
-        p.name?.toLowerCase().includes(q) ||
-        p.category?.toLowerCase().includes(q) ||
-        p.locationName?.toLowerCase().includes(q)
-      );
-      return matchesDeptRole && matchesCategory && matchesSearch;
-    });
+    return products
+      .filter(p => p && ((p.name && String(p.name).trim()) || (p.code && String(p.code).trim())))
+      .filter(p => {
+        const matchesDeptRole = canSeeAll || p.category === myDept;
+        const matchesCategory = prodCategoryFilter === 'ALL' || p.category === prodCategoryFilter;
+        const q = prodSearch.trim().toLowerCase();
+        const matchesSearch = !q || (
+          p.code?.toLowerCase().includes(q) ||
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.locationName?.toLowerCase().includes(q)
+        );
+        return matchesDeptRole && matchesCategory && matchesSearch;
+      });
   }, [products, canSeeAll, myDept, prodCategoryFilter, prodSearch]);
 
-  // Filtered Vendors
+  // Filtered Vendors (Filter out ghost/cleared records)
   const filteredVendors = useMemo(() => {
-    return vendors.filter(v => {
-      const matchesDeptRole = canSeeAll || v.department === myDept || v.department === 'BOTH';
-      const matchesDeptFilter = vendorDeptFilter === 'ALL' || v.department === vendorDeptFilter || v.department === 'BOTH';
-      const q = vendorSearch.trim().toLowerCase();
-      const matchesSearch = !q || (
-        v.code?.toLowerCase().includes(q) ||
-        v.name?.toLowerCase().includes(q) ||
-        v.contactPerson?.toLowerCase().includes(q) ||
-        v.phone?.toLowerCase().includes(q) ||
-        v.taxId?.toLowerCase().includes(q)
-      );
-      return matchesDeptRole && matchesDeptFilter && matchesSearch;
-    });
+    return vendors
+      .filter(v => v && ((v.name && String(v.name).trim()) || (v.code && String(v.code).trim())))
+      .filter(v => {
+        const matchesDeptRole = canSeeAll || v.department === myDept || v.department === 'BOTH';
+        const matchesDeptFilter = vendorDeptFilter === 'ALL' || v.department === vendorDeptFilter || v.department === 'BOTH';
+        const q = vendorSearch.trim().toLowerCase();
+        const matchesSearch = !q || (
+          v.code?.toLowerCase().includes(q) ||
+          v.name?.toLowerCase().includes(q) ||
+          v.contactPerson?.toLowerCase().includes(q) ||
+          v.phone?.toLowerCase().includes(q) ||
+          v.taxId?.toLowerCase().includes(q)
+        );
+        return matchesDeptRole && matchesDeptFilter && matchesSearch;
+      });
   }, [vendors, canSeeAll, myDept, vendorDeptFilter, vendorSearch]);
 
   // Filtered Storage Locations (Clean Simple by Name)
   const filteredLocations = useMemo(() => {
-    return storageLocations.filter(l => {
-      const matchesDeptRole = canSeeAll || l.department === myDept || l.department === 'ALL';
-      const matchesDeptFilter = locDeptFilter === 'ALL' || l.department === locDeptFilter;
-      const q = locSearch.trim().toLowerCase();
-      const matchesSearch = !q || (
-        l.name?.toLowerCase().includes(q)
-      );
-      return matchesDeptRole && matchesDeptFilter && matchesSearch;
-    });
+    return storageLocations
+      .filter(l => l && l.name && String(l.name).trim())
+      .filter(l => {
+        const matchesDeptRole = canSeeAll || l.department === myDept || l.department === 'ALL';
+        const matchesDeptFilter = locDeptFilter === 'ALL' || l.department === locDeptFilter;
+        const q = locSearch.trim().toLowerCase();
+        const matchesSearch = !q || (
+          l.name?.toLowerCase().includes(q)
+        );
+        return matchesDeptRole && matchesDeptFilter && matchesSearch;
+      });
   }, [storageLocations, canSeeAll, myDept, locDeptFilter, locSearch]);
 
   // Users State & Filter
@@ -95,19 +101,21 @@ export default function MasterDataView({
   const [visiblePasswords, setVisiblePasswords] = useState({});
 
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
-      const matchesDept = userDeptFilter === 'ALL' || u.department === userDeptFilter || u.department === 'ALL';
-      const q = userSearch.trim().toLowerCase();
-      const matchesSearch = !q || (
-        u.name?.toLowerCase().includes(q) ||
-        u.employeeName?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q) ||
-        u.employeeId?.toLowerCase().includes(q) ||
-        u.title?.toLowerCase().includes(q) ||
-        u.roleId?.toLowerCase().includes(q)
-      );
-      return matchesDept && matchesSearch;
-    });
+    return users
+      .filter(u => u && ((u.username && String(u.username).trim()) || (u.name && String(u.name).trim())))
+      .filter(u => {
+        const matchesDept = userDeptFilter === 'ALL' || u.department === userDeptFilter || u.department === 'ALL';
+        const q = userSearch.trim().toLowerCase();
+        const matchesSearch = !q || (
+          u.name?.toLowerCase().includes(q) ||
+          u.employeeName?.toLowerCase().includes(q) ||
+          u.username?.toLowerCase().includes(q) ||
+          u.employeeId?.toLowerCase().includes(q) ||
+          u.title?.toLowerCase().includes(q) ||
+          u.roleId?.toLowerCase().includes(q)
+        );
+        return matchesDept && matchesSearch;
+      });
   }, [users, userDeptFilter, userSearch]);
 
   // Access check
@@ -240,6 +248,16 @@ export default function MasterDataView({
 
         {/* Primary Action Button in Header */}
         <div className="flex items-center gap-2.5">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 hover:text-indigo-600 flex items-center gap-2 text-xs sm:text-sm font-semibold shadow-2xs transition-all cursor-pointer active:scale-95"
+              title="รีเฟรชดึงข้อมูลล่าสุดจาก Google Sheets"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">รีเฟรชข้อมูล</span>
+            </button>
+          )}
           {activeTab === 'products' ? (
             <button
               onClick={() => { setEditProd(null); setShowProdModal(true); }}

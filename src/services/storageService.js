@@ -49,11 +49,16 @@ export const storageService = {
   // Products
   getProducts() {
     const data = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    const products = data ? JSON.parse(data) : initialProducts;
+    const rawProducts = data ? JSON.parse(data) : initialProducts;
     const locations = this.getStorageLocations();
     
-    let needsSave = false;
-    const migrated = products.map(p => {
+    // Discard any ghost/cleared products where both code and name are empty
+    const validProducts = Array.isArray(rawProducts)
+      ? rawProducts.filter(p => p && ((p.name && String(p.name).trim()) || (p.code && String(p.code).trim())))
+      : [];
+
+    let needsSave = validProducts.length !== (Array.isArray(rawProducts) ? rawProducts.length : 0);
+    const migrated = validProducts.map(p => {
       let item = { ...p };
       const cat = item.category || item.department || 'PD';
       if (!item.category || !item.department || item.category !== cat || item.department !== cat) {
@@ -502,19 +507,22 @@ export const storageService = {
   loadFromGAS(data) {
     if (!data) return false;
 
-    // 1. Products: overwrite local storage with Google Sheets data
+    // 1. Products: overwrite local storage with Google Sheets data (filtered against ghost rows)
     if (Array.isArray(data.products)) {
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
+      const validProducts = data.products.filter(p => p && ((p.name && String(p.name).trim()) || (p.code && String(p.code).trim())));
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(validProducts));
     }
 
     // 2. Vendors: overwrite local storage with Google Sheets data
     if (Array.isArray(data.vendors)) {
-      localStorage.setItem(STORAGE_KEYS.VENDORS, JSON.stringify(data.vendors));
+      const validVendors = data.vendors.filter(v => v && ((v.name && String(v.name).trim()) || (v.code && String(v.code).trim())));
+      localStorage.setItem(STORAGE_KEYS.VENDORS, JSON.stringify(validVendors));
     }
 
     // 3. Storage Locations: overwrite local storage with Google Sheets data
     if (Array.isArray(data.storageLocations)) {
-      localStorage.setItem(STORAGE_KEYS.STORAGE_LOCATIONS, JSON.stringify(data.storageLocations));
+      const validLocations = data.storageLocations.filter(l => l && l.name && String(l.name).trim());
+      localStorage.setItem(STORAGE_KEYS.STORAGE_LOCATIONS, JSON.stringify(validLocations));
     }
     
     // 4. PRs: Sync directly from Google Sheets (Single Source of Truth)
